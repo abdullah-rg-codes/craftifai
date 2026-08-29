@@ -21,7 +21,6 @@
     "test:integration": "node -e \"for (const key of ['DATABASE_URL','DATABASE_ADMIN_URL','REDIS_URL','SESSION_SECRET']) if (!process.env[key]) throw new Error('Missing integration-test environment variable: ' + key)\" && vitest run apps/api/test/foundation.test.ts",
     "test:watch": "vitest",
     "dev": "pnpm --filter api dev & pnpm --filter web dev",
-    "db:migrate": "pnpm --filter db migrate",
     "db:migrate:down": "pnpm --filter db migrate:down",
     "db:migrate": "pnpm --filter db run migrate",
     "db:drop": "pnpm --filter db drop",
