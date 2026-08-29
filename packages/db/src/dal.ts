@@ -1,30 +1,30 @@
 import type { QueryResultRow } from 'pg';
 import type { TransactionContext } from './transaction.js';
 
-export type DbUser = {
+export interface DbUser {
   id: string;
   email: string;
   password_hash: string;
   display_name: string | null;
   created_at: Date;
-};
+}
 
-export type DbSession = {
+export interface DbSession {
   id: string;
   user_id: string;
   token_hash: string;
   expires_at: Date;
   revoked_at: Date | null;
   created_at: Date;
-};
+}
 
-export type DbOrganization = {
+export interface DbOrganization {
   id: string;
   name: string;
   created_at: Date;
-};
+}
 
-export type DbMembership = {
+export interface DbMembership {
   id: string;
   org_id: string;
   user_id: string;
@@ -32,9 +32,9 @@ export type DbMembership = {
   status: 'active' | 'suspended';
   created_at: Date;
   updated_at: Date;
-};
+}
 
-export type DbInvitation = {
+export interface DbInvitation {
   id: string;
   org_id: string;
   email: string;
@@ -44,9 +44,9 @@ export type DbInvitation = {
   status: 'pending' | 'accepted' | 'revoked' | 'expired';
   expires_at: Date;
   created_at: Date;
-};
+}
 
-export type DbAuditEvent = {
+export interface DbAuditEvent {
   id: string;
   org_id: string;
   actor_user_id: string;
@@ -55,7 +55,7 @@ export type DbAuditEvent = {
   target_id: string | null;
   metadata: Record<string, unknown>;
   created_at: Date;
-};
+}
 
 async function one<T extends QueryResultRow>(
   ctx: TransactionContext,
