@@ -21,7 +21,7 @@
     "dev": "pnpm --filter api dev & pnpm --filter web dev",
     "db:migrate": "pnpm --filter db migrate",
     "db:migrate:down": "pnpm --filter db migrate:down",
-    "db:create": "pnpm --filter db create",
+    "db:migrate": "pnpm --filter db run migrate",
     "db:drop": "pnpm --filter db drop",
     "compose:up": "docker compose up --build -d",
     "compose:down": "docker compose down -v",
