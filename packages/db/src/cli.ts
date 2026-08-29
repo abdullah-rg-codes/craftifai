@@ -1,11 +1,11 @@
 import { Client } from 'pg';
 import { pathToFileURL } from 'node:url';
-import { databaseUrl } from './env.js';
+import { databaseAdminUrl } from './env.js';
 
 const command = process.argv[2];
 
 async function withAdminClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
-  const url = new URL(databaseUrl());
+  const url = new URL(databaseAdminUrl());
   const dbName = url.pathname.slice(1).split('?')[0];
   if (!dbName) {
     throw new Error('DATABASE_URL must include a database name');
@@ -21,7 +21,7 @@ async function withAdminClient<T>(fn: (client: Client) => Promise<T>): Promise<T
 }
 
 export async function createDatabase(): Promise<void> {
-  const url = new URL(databaseUrl());
+  const url = new URL(databaseAdminUrl());
   const dbName = url.pathname.slice(1).split('?')[0];
   if (!dbName) {
     throw new Error('DATABASE_URL must include a database name');
@@ -40,7 +40,7 @@ export async function createDatabase(): Promise<void> {
 }
 
 export async function dropDatabase(): Promise<void> {
-  const url = new URL(databaseUrl());
+  const url = new URL(databaseAdminUrl());
   const dbName = url.pathname.slice(1).split('?')[0];
   if (!dbName) {
     throw new Error('DATABASE_URL must include a database name');

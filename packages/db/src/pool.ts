@@ -1,4 +1,4 @@
-import { Pool, types } from 'pg';
+import { Pool, types, type PoolClient } from 'pg';
 import { databaseUrl } from './env.js';
 
 // Parse numeric types as strings to avoid loss of precision; the application layer
@@ -6,13 +6,18 @@ import { databaseUrl } from './env.js';
 types.setTypeParser(types.builtins.INT8, (val) => val);
 types.setTypeParser(types.builtins.NUMERIC, (val) => val);
 
-export function createPool(): Pool {
+export interface DatabasePool {
+  connect(): Promise<PoolClient>;
+  end(): Promise<void>;
+}
+
+export function createPool(
+  options: { connectionString?: string; max?: number } = {},
+): DatabasePool {
   return new Pool({
-    connectionString: databaseUrl(),
-    max: 20,
+    connectionString: options.connectionString ?? databaseUrl(),
+    max: options.max ?? 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
   });
 }
-
-export type { Pool };

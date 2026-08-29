@@ -52,7 +52,8 @@ jobs:
         ports:
           - 6379:6379
     env:
-      DATABASE_URL: postgres://craftifai:craftifai@localhost:5432/craftifai?sslmode=disable
+      DATABASE_ADMIN_URL: postgres://craftifai:craftifai@localhost:5432/craftifai?sslmode=disable
+      DATABASE_URL: postgres://craftifai_app:craftifai_test@localhost:5432/craftifai?sslmode=disable
       REDIS_URL: redis://localhost:6379/0
       SESSION_SECRET: ci-session-secret-not-real
       ENCRYPTION_KEY_BASE64: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
@@ -70,7 +71,9 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm db:create
+      - run: >-
+          psql "$DATABASE_ADMIN_URL" --set ON_ERROR_STOP=1
+          --command "CREATE ROLE craftifai_app LOGIN PASSWORD 'craftifai_test' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS"
       - run: pnpm db:migrate
       - run: pnpm test
 

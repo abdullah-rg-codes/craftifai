@@ -28,11 +28,13 @@ CREATE TABLE invitations (
     invited_by uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     status invitation_status NOT NULL DEFAULT 'pending',
     expires_at timestamptz NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (org_id, email) WHERE status = 'pending'
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_invitations_org ON invitations (org_id);
+CREATE UNIQUE INDEX uq_invitations_org_pending_email
+    ON invitations (org_id, email)
+    WHERE status = 'pending';
 
 -- migrate:down
 

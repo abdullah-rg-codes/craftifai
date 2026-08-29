@@ -1,19 +1,33 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { Router, type Request } from 'express';
-import type { Pool } from 'pg';
 import type { Redis } from 'ioredis';
 import { z } from 'zod';
-import { withTransaction, createDal } from '@craftifai/db';
+import {
+  withSystemTransaction,
+  withTransaction,
+  createOrgDal,
+  createSystemDal,
+  type DatabasePool,
+} from '@craftifai/db';
 import { notFound, conflict, AppError } from '@craftifai/shared';
 import type { Logger } from '../logger.js';
 import type { AuthContext } from '../auth.js';
-import { requireAdmin, revokeAllSessionsForUser } from '../auth.js';
+import {
+  invalidateRevokedUserSessions,
+  invalidateUserSessionCache,
+  requireAdmin,
+} from '../auth.js';
 import { asyncHandler } from '../errors.js';
 import type { DbMembership } from '@craftifai/db';
+import type { OrgDal } from '@craftifai/db';
 
 const inviteSchema = z.object({
   email: z.string().email(),
   role: z.enum(['administrator', 'member']),
+});
+
+const acceptInvitationSchema = z.object({
+  token: z.string().min(32),
 });
 
 const listQuerySchema = z.object({
@@ -29,8 +43,17 @@ const updateStatusSchema = z.object({
   status: z.enum(['active', 'suspended']),
 });
 
+const membershipParamsSchema = z.object({
+  membershipId: z.string().uuid(),
+});
+
+const cursorSchema = z.object({
+  createdAt: z.string().datetime(),
+  id: z.string().uuid(),
+});
+
 export async function auditMembershipChange(
-  ctx: Awaited<ReturnType<typeof createDal>>,
+  ctx: OrgDal,
   auth: AuthContext,
   action: string,
   targetId: string,
@@ -48,25 +71,86 @@ export async function auditMembershipChange(
 
 function encodeCursor(membership: DbMembership): string {
   const payload = JSON.stringify({
-    c: membership.created_at.toISOString(),
-    i: membership.id,
+    createdAt: membership.created_at.toISOString(),
+    id: membership.id,
   });
   return Buffer.from(payload).toString('base64url');
 }
 
 function decodeCursor(cursor: string): { createdAt: Date; id: string } {
-  const payload = Buffer.from(cursor, 'base64url').toString('utf-8');
-  const parsed = JSON.parse(payload) as { c: string; i: string };
-  return { createdAt: new Date(parsed.c), id: parsed.i };
+  try {
+    const payload = Buffer.from(cursor, 'base64url').toString('utf8');
+    const parsed = cursorSchema.parse(JSON.parse(payload) as unknown);
+    return { createdAt: new Date(parsed.createdAt), id: parsed.id };
+  } catch {
+    throw new AppError('VALIDATION', 'Invalid cursor', 400);
+  }
 }
 
 export function buildMembersRouter(
-  _logger: Logger,
-  pool: Pool,
+  logger: Logger,
+  pool: DatabasePool,
   redis: Redis,
   getAuth: (req: Request) => AuthContext | undefined,
 ): Router {
   const router = Router();
+  const invalidateCache = async (userId: string): Promise<void> => {
+    try {
+      await invalidateUserSessionCache(redis, userId);
+    } catch (error) {
+      logger.error({ err: error, userId }, 'session cache invalidation failed');
+    }
+  };
+  const invalidateRevokedSessions = async (userId: string): Promise<void> => {
+    try {
+      await invalidateRevokedUserSessions(redis, userId);
+    } catch (error) {
+      logger.error({ err: error, userId }, 'revoked session cache invalidation failed');
+    }
+  };
+
+  router.post(
+    '/invitations/accept',
+    asyncHandler(async (req, res) => {
+      const auth = getAuth(req);
+      if (!auth) {
+        throw new AppError('UNAUTHORIZED', 'Authentication required', 401);
+      }
+      const input = acceptInvitationSchema.parse(req.body);
+      const tokenHash = createHash('sha256').update(input.token).digest('base64url');
+      const membership = await withSystemTransaction(pool, async (ctx) => {
+        const dal = createSystemDal(ctx);
+        const user = await dal.users.findById(auth.userId);
+        if (!user) {
+          throw new AppError('UNAUTHORIZED', 'Authentication required', 401);
+        }
+        const invitation = await dal.invitations.acceptPendingByTokenHash(tokenHash);
+        if (!invitation || invitation.email.toLowerCase() !== user.email.toLowerCase()) {
+          throw notFound('Invitation not found');
+        }
+        const created = await dal.memberships.create({
+          orgId: invitation.org_id,
+          userId: user.id,
+          role: invitation.role,
+        });
+        await dal.audit.create({
+          orgId: invitation.org_id,
+          actorUserId: user.id,
+          action: 'invitation.accept',
+          targetType: 'membership',
+          targetId: created.id,
+          metadata: { invitation_id: invitation.id },
+        });
+        return created;
+      });
+      await invalidateCache(auth.userId);
+      res.status(201).json({
+        membership_id: membership.id,
+        org_id: membership.org_id,
+        role: membership.role,
+      });
+    }),
+  );
 
   router.get(
     '/',
@@ -78,27 +162,25 @@ export function buildMembersRouter(
       requireAdmin(auth);
       const query = listQuerySchema.parse(req.query);
       const cursor = query.cursor ? decodeCursor(query.cursor) : null;
-      const { members, nextCursor } = await withTransaction(
-        pool,
-        auth.orgId,
-        async (ctx) => {
-          const dal = createDal(ctx);
-          const rows = await dal.memberships.listByOrgId(auth.orgId, cursor, query.limit);
-          const hasMore = rows.length > query.limit;
-          const trimmed = hasMore ? rows.slice(0, query.limit) : rows;
-          return {
-            members: trimmed.map((m) => ({
-              id: m.id,
-              user_id: m.user_id,
-              role: m.role,
-              status: m.status,
-              created_at: m.created_at,
-              updated_at: m.updated_at,
-            })),
-            nextCursor: hasMore ? encodeCursor(trimmed[trimmed.length - 1]!) : null,
-          };
-        },
-      );
+      const { members, nextCursor } = await withTransaction(pool, auth.orgId, async (ctx) => {
+        const dal = createOrgDal(ctx);
+        const rows = await dal.memberships.listByOrgId(auth.orgId, cursor, query.limit);
+        const hasMore = rows.length > query.limit;
+        const trimmed = hasMore ? rows.slice(0, query.limit) : rows;
+        return {
+          members: trimmed.map((m) => ({
+            id: m.id,
+            user_id: m.user_id,
+            email: m.email,
+            display_name: m.display_name,
+            role: m.role,
+            status: m.status,
+            created_at: m.created_at,
+            updated_at: m.updated_at,
+          })),
+          nextCursor: hasMore ? encodeCursor(trimmed[trimmed.length - 1]!) : null,
+        };
+      });
       res.json({ members, next_cursor: nextCursor });
     }),
   );
@@ -115,8 +197,9 @@ export function buildMembersRouter(
       const token = randomBytes(32).toString('base64url');
       const tokenHash = createHash('sha256').update(token).digest('base64url');
       const invitation = await withTransaction(pool, auth.orgId, async (ctx) => {
-        const dal = createDal(ctx);
-        const existing = await dal.memberships.findByOrgAndUser(auth.orgId, input.email);
+        const dal = createOrgDal(ctx);
+        await dal.invitations.expirePendingForEmail(auth.orgId, input.email);
+        const existing = await dal.memberships.findByOrgAndEmail(auth.orgId, input.email);
         if (existing) {
           throw conflict('User is already a member of this organization');
         }
@@ -152,10 +235,10 @@ export function buildMembersRouter(
         throw notFound('Organization not found');
       }
       requireAdmin(auth);
-      const membershipId = req.params.membershipId as string;
+      const { membershipId } = membershipParamsSchema.parse(req.params);
       const input = updateRoleSchema.parse(req.body);
-      await withTransaction(pool, auth.orgId, async (ctx) => {
-        const dal = createDal(ctx);
+      const affectedUserId = await withTransaction(pool, auth.orgId, async (ctx) => {
+        const dal = createOrgDal(ctx);
         // Lock the organization row to serialize last-admin checks.
         await ctx.query('SELECT 1 FROM organizations WHERE id = $1 FOR UPDATE', [auth.orgId]);
         const membership = await dal.memberships.findById(membershipId);
@@ -165,16 +248,21 @@ export function buildMembersRouter(
         if (membership.role === 'administrator' && input.role === 'member') {
           const count = await dal.memberships.countActiveAdmins(auth.orgId);
           if (count <= 1) {
-            throw new AppError('FORBIDDEN', 'Organization must keep at least one active administrator', 403);
+            throw new AppError(
+              'FORBIDDEN',
+              'Organization must keep at least one active administrator',
+              403,
+            );
           }
         }
         await dal.memberships.updateRole(membershipId, input.role);
-        await revokeAllSessionsForUser(pool, redis, membership.user_id);
         await auditMembershipChange(dal, auth, 'membership.role.update', membershipId, {
           previous_role: membership.role,
           new_role: input.role,
         });
+        return membership.user_id;
       });
+      await invalidateCache(affectedUserId);
       res.status(204).send();
     }),
   );
@@ -187,10 +275,10 @@ export function buildMembersRouter(
         throw notFound('Organization not found');
       }
       requireAdmin(auth);
-      const membershipId = req.params.membershipId as string;
+      const { membershipId } = membershipParamsSchema.parse(req.params);
       const input = updateStatusSchema.parse(req.body);
-      await withTransaction(pool, auth.orgId, async (ctx) => {
-        const dal = createDal(ctx);
+      const affectedUserId = await withTransaction(pool, auth.orgId, async (ctx) => {
+        const dal = createOrgDal(ctx);
         await ctx.query('SELECT 1 FROM organizations WHERE id = $1 FOR UPDATE', [auth.orgId]);
         const membership = await dal.memberships.findById(membershipId);
         if (!membership || membership.org_id !== auth.orgId) {
@@ -199,16 +287,28 @@ export function buildMembersRouter(
         if (membership.role === 'administrator' && input.status === 'suspended') {
           const count = await dal.memberships.countActiveAdmins(auth.orgId);
           if (count <= 1) {
-            throw new AppError('FORBIDDEN', 'Organization must keep at least one active administrator', 403);
+            throw new AppError(
+              'FORBIDDEN',
+              'Organization must keep at least one active administrator',
+              403,
+            );
           }
         }
         await dal.memberships.updateStatus(membershipId, input.status);
-        await revokeAllSessionsForUser(pool, redis, membership.user_id);
+        if (input.status === 'suspended') {
+          await dal.memberships.revokeSessionsForUser(membership.user_id);
+        }
         await auditMembershipChange(dal, auth, 'membership.status.update', membershipId, {
           previous_status: membership.status,
           new_status: input.status,
         });
+        return membership.user_id;
       });
+      if (input.status === 'suspended') {
+        await invalidateRevokedSessions(affectedUserId);
+      } else {
+        await invalidateCache(affectedUserId);
+      }
       res.status(204).send();
     }),
   );
@@ -221,27 +321,33 @@ export function buildMembersRouter(
         throw notFound('Organization not found');
       }
       requireAdmin(auth);
-      const membershipId = req.params.membershipId as string;
-      await withTransaction(pool, auth.orgId, async (ctx) => {
-        const dal = createDal(ctx);
+      const { membershipId } = membershipParamsSchema.parse(req.params);
+      const affectedUserId = await withTransaction(pool, auth.orgId, async (ctx) => {
+        const dal = createOrgDal(ctx);
         await ctx.query('SELECT 1 FROM organizations WHERE id = $1 FOR UPDATE', [auth.orgId]);
         const membership = await dal.memberships.findById(membershipId);
         if (!membership || membership.org_id !== auth.orgId) {
           throw notFound('Member not found');
         }
-        if (membership.role === 'administrator') {
+        if (membership.role === 'administrator' && membership.status === 'active') {
           const count = await dal.memberships.countActiveAdmins(auth.orgId);
           if (count <= 1) {
-            throw new AppError('FORBIDDEN', 'Organization must keep at least one active administrator', 403);
+            throw new AppError(
+              'FORBIDDEN',
+              'Organization must keep at least one active administrator',
+              403,
+            );
           }
         }
+        await dal.memberships.revokeSessionsForUser(membership.user_id);
         await dal.memberships.delete(membershipId);
-        await revokeAllSessionsForUser(pool, redis, membership.user_id);
         await auditMembershipChange(dal, auth, 'membership.delete', membershipId, {
           role: membership.role,
           status: membership.status,
         });
+        return membership.user_id;
       });
+      await invalidateRevokedSessions(affectedUserId);
       res.status(204).send();
     }),
   );

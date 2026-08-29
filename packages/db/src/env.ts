@@ -12,6 +12,10 @@ export function databaseUrl(): string {
   return requireEnv('DATABASE_URL');
 }
 
+export function databaseAdminUrl(): string {
+  return process.env.DATABASE_ADMIN_URL ?? databaseUrl();
+}
+
 export function redisUrl(): string {
   return requireEnv('REDIS_URL');
 }

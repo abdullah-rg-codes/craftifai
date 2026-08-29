@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express';
-import type { Pool } from 'pg';
 import type { Redis } from 'ioredis';
+import type { DatabasePool } from '@craftifai/db';
 import { z } from 'zod';
 import {
   loginUser,
@@ -28,7 +28,7 @@ const loginSchema = z.object({
 
 export function buildAuthRouter(
   _logger: Logger,
-  pool: Pool,
+  pool: DatabasePool,
   redis: Redis,
   getAuth: (req: Request) => AuthContext | undefined,
 ): Router {

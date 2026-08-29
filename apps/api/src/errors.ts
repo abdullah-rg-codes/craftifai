@@ -1,6 +1,6 @@
 import type { ErrorRequestHandler, Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { AppError, validation } from '@craftifai/shared';
+import { AppError, conflict, validation } from '@craftifai/shared';
 import type { Logger } from './logger.js';
 
 export function createErrorHandler(logger: Logger): ErrorRequestHandler {
@@ -11,26 +11,44 @@ export function createErrorHandler(logger: Logger): ErrorRequestHandler {
     if (err instanceof ZodError) {
       const issues = err.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
       const error = validation('Invalid request body or query', { issues });
-      logger.warn({
-        code: error.code,
-        status: error.status,
-        path: req.path,
-        method: req.method,
-        correlationId: req.correlationId,
-      }, error.message);
+      logger.warn(
+        {
+          code: error.code,
+          status: error.status,
+          path: req.path,
+          method: req.method,
+          correlationId: req.correlationId,
+        },
+        error.message,
+      );
       res.status(error.status).json({
         error: { code: error.code, message: error.message, details: error.details },
       });
       return;
     }
+    if (
+      typeof err === 'object' &&
+      err !== null &&
+      'code' in err &&
+      (err as { code: unknown }).code === '23505'
+    ) {
+      const error = conflict('Resource already exists');
+      res.status(error.status).json({
+        error: { code: error.code, message: error.message },
+      });
+      return;
+    }
     if (err instanceof AppError) {
-      logger.warn({
-        code: err.code,
-        status: err.status,
-        path: req.path,
-        method: req.method,
-        correlationId: req.correlationId,
-      }, err.message);
+      logger.warn(
+        {
+          code: err.code,
+          status: err.status,
+          path: req.path,
+          method: req.method,
+          correlationId: req.correlationId,
+        },
+        err.message,
+      );
       res.status(err.status).json({
         error: { code: err.code, message: err.message, details: err.details },
       });
@@ -38,7 +56,11 @@ export function createErrorHandler(logger: Logger): ErrorRequestHandler {
     }
     logger.error(
       {
-        err,
+        errorName: err instanceof Error ? err.name : 'UnknownError',
+        errorCode:
+          typeof err === 'object' && err !== null && 'code' in err
+            ? String((err as { code: unknown }).code)
+            : undefined,
         path: req.path,
         method: req.method,
         correlationId: req.correlationId,

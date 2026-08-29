@@ -31,9 +31,9 @@ CREATE TABLE credit_reservations (
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     status reservation_status NOT NULL,
     reserved_credits bigint NOT NULL CHECK (reserved_credits > 0),
-    max_total_tokens int NOT NULL,
-    actual_total_tokens int,
-    settled_credits bigint,
+    max_total_tokens int NOT NULL CHECK (max_total_tokens > 0),
+    actual_total_tokens int CHECK (actual_total_tokens >= 0),
+    settled_credits bigint CHECK (settled_credits > 0 AND settled_credits <= reserved_credits),
     expires_at timestamptz NOT NULL,
     settled_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now()
@@ -43,10 +43,14 @@ CREATE INDEX idx_credit_reservations_org_created ON credit_reservations (org_id,
 CREATE INDEX idx_credit_reservations_user_created ON credit_reservations (user_id, created_at, id);
 CREATE INDEX idx_credit_reservations_expires_reserved ON credit_reservations (expires_at) WHERE status = 'reserved';
 
+ALTER TABLE credit_ledger
+    ADD CONSTRAINT fk_credit_ledger_reservation
+    FOREIGN KEY (reservation_id) REFERENCES credit_reservations(id);
+
 -- migrate:down
 
-DROP TABLE IF EXISTS credit_reservations;
 DROP TABLE IF EXISTS credit_ledger;
+DROP TABLE IF EXISTS credit_reservations;
 DROP TABLE IF EXISTS org_credit_accounts;
 DROP TYPE IF EXISTS reservation_status;
 DROP TYPE IF EXISTS ledger_kind;

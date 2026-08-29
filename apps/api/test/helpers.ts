@@ -2,16 +2,19 @@ import { execSync } from 'node:child_process';
 import supertest from 'supertest';
 import {
   createPool,
+  databaseAdminUrl,
   databaseUrl,
   redisUrl,
   withSystemTransaction,
-  createDal,
+  createSystemDal,
 } from '@craftifai/db';
 import { hashPassword } from '@craftifai/shared';
 import { buildApp } from '../src/app.js';
 import { createLogger } from '../src/logger.js';
 import { createRedis } from '../src/redis.js';
 import type { Application } from 'express';
+import type { Redis } from 'ioredis';
+import type { DatabasePool } from '@craftifai/db';
 
 export function hasTestDatabase(): boolean {
   try {
@@ -43,8 +46,12 @@ export function createTestApp() {
   const logger = createLogger();
   const pool = createPool();
   const redis = createRedis();
+  const adminPool = createPool({
+    connectionString: databaseAdminUrl(),
+    max: 2,
+  });
   const app = buildApp(logger, pool, redis);
-  return { app: supertest(app as Application), pool, redis, logger };
+  return { app: supertest(app as Application), pool, adminPool, redis, logger };
 }
 
 export async function directCreateUser(
@@ -54,7 +61,7 @@ export async function directCreateUser(
 ): Promise<{ id: string; email: string; password: string }> {
   const passwordHash = await hashPassword(password);
   return withSystemTransaction(pool, async (ctx) => {
-    const dal = createDal(ctx);
+    const dal = createSystemDal(ctx);
     const user = await dal.users.create({ email, passwordHash, displayName: email });
     return { id: user.id, email: user.email, password };
   });
@@ -67,7 +74,7 @@ export async function directAddMember(
   role: 'administrator' | 'member' = 'member',
 ): Promise<{ id: string }> {
   return withSystemTransaction(pool, async (ctx) => {
-    const dal = createDal(ctx);
+    const dal = createSystemDal(ctx);
     const membership = await dal.memberships.create({ orgId, userId, role, status: 'active' });
     return { id: membership.id };
   });
@@ -83,7 +90,9 @@ export async function registerAndLogin(
   app: ReturnType<typeof supertest>,
   email: string,
 ): Promise<{ userId: string; orgId: string; cookie: string[] }> {
-  const registerResponse = await app.post('/auth/register').send({ email, password: 'password123' });
+  const registerResponse = await app
+    .post('/auth/register')
+    .send({ email, password: 'password123' });
   if (registerResponse.status !== 201) {
     throw new Error(`Registration failed: ${registerResponse.status} ${registerResponse.text}`);
   }
@@ -110,32 +119,25 @@ export async function login(
   return getCookies(response);
 }
 
-export async function truncateTables(pool: ReturnType<typeof createPool>): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.is_system = 'true'");
-    await client.query(`
+export async function truncateTables(adminPool: DatabasePool, redis: Redis): Promise<void> {
+  await withSystemTransaction(adminPool, async (ctx) => {
+    await ctx.query(`
       TRUNCATE TABLE
         audit_events,
         idempotency_keys,
         webhook_events,
         purchases,
-        credit_reservations,
         credit_ledger,
+        credit_reservations,
         org_credit_accounts,
+        model_configurations,
         invitations,
         memberships,
         organizations,
         sessions,
         users
-      RESTART IDENTITY CASCADE;
+      CASCADE
     `);
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
-  }
+  });
+  await redis.flushdb();
 }

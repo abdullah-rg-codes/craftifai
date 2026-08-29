@@ -16,6 +16,10 @@ CREATE TABLE purchases (
 
 CREATE INDEX idx_purchases_org_created ON purchases (org_id, created_at, id);
 
+ALTER TABLE credit_ledger
+    ADD CONSTRAINT fk_credit_ledger_purchase
+    FOREIGN KEY (purchase_id) REFERENCES purchases(id);
+
 CREATE TABLE webhook_events (
     provider_event_id text PRIMARY KEY,
     payload_hash bytea NOT NULL,
@@ -35,6 +39,8 @@ CREATE TABLE idempotency_keys (
     created_at timestamptz NOT NULL DEFAULT now(),
     completed_at timestamptz,
     expires_at timestamptz NOT NULL,
+    CONSTRAINT fk_idempotency_reservation
+        FOREIGN KEY (reservation_id) REFERENCES credit_reservations(id),
     PRIMARY KEY (org_id, endpoint, key)
 );
 
@@ -55,8 +61,8 @@ CREATE TABLE model_configurations (
 
 CREATE TABLE audit_events (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    actor_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
+    actor_user_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     action text NOT NULL,
     target_type text,
     target_id uuid,
@@ -72,6 +78,7 @@ DROP TABLE IF EXISTS audit_events;
 DROP TABLE IF EXISTS model_configurations;
 DROP TABLE IF EXISTS idempotency_keys;
 DROP TABLE IF EXISTS webhook_events;
+ALTER TABLE credit_ledger DROP CONSTRAINT IF EXISTS fk_credit_ledger_purchase;
 DROP TABLE IF EXISTS purchases;
 DROP TYPE IF EXISTS deployment_mode;
 DROP TYPE IF EXISTS idempotency_status;

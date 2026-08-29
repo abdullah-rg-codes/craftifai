@@ -17,7 +17,10 @@ cp .env.example .env
 pnpm compose:up
 pnpm db:migrate
 
-# Run tests (requires real PostgreSQL + Redis)
+# Fast tests without infrastructure
+pnpm test:unit
+
+# Complete suite; fails fast unless PostgreSQL and Redis test URLs are configured
 pnpm test
 
 # Start dev servers
@@ -42,3 +45,12 @@ This is a pnpm monorepo with TypeScript `strict: true` and `noUncheckedIndexedAc
 - `packages/shared` — shared types and utilities
 
 Tests for credit correctness, idempotency, and concurrency run against a real PostgreSQL database and Redis instance. No SQLite, no mocked repositories.
+
+### Session revocation guarantee
+
+Sessions are PostgreSQL-authoritative and cached in Redis for at most 60 seconds.
+Suspending or removing a member revokes all of that user's sessions in the same
+database transaction as the membership change, then actively evicts their Redis
+entries. Revocation is immediate when Redis is healthy and bounded by the 60-second
+cache TTL if eviction fails. No application-process memory participates in the
+guarantee.

@@ -1,17 +1,18 @@
 import { randomBytes, createHash } from 'node:crypto';
 import type { Request, Response } from 'express';
 import type { Redis } from 'ioredis';
-import type { Pool } from 'pg';
-import { withSystemTransaction, createDal } from '@craftifai/db';
+import { withSystemTransaction, createSystemDal, type DatabasePool } from '@craftifai/db';
 import { hashPassword, verifyPassword, AppError, unauthorized } from '@craftifai/shared';
 
 const SESSION_COOKIE = 'craftifai_session';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
-const CACHE_TTL_SECONDS = 60;
+const SESSION_TTL_SECONDS = SESSION_TTL_MS / 1000;
+export const SESSION_REVOCATION_WINDOW_SECONDS = 60;
 
 interface SessionCache {
   readonly userId: string;
   readonly email: string;
+  readonly sessionExpiresAt: string;
   readonly memberships: readonly {
     readonly id: string;
     readonly orgId: string;
@@ -39,26 +40,34 @@ function sessionKey(hash: string): string {
   return `session:${hash}`;
 }
 
+function revokedSessionKey(hash: string): string {
+  return `session_revoked:${hash}`;
+}
+
 function userSessionsKey(userId: string): string {
   return `user_sessions:${userId}`;
 }
 
 export async function createSession(
-  pool: Pool,
+  pool: DatabasePool,
   redis: Redis,
   userId: string,
 ): Promise<{ token: string; hash: string }> {
   const { token, hash } = generateSessionToken();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await withSystemTransaction(pool, async (ctx) => {
-    const dal = createDal(ctx);
+    const dal = createSystemDal(ctx);
     await dal.sessions.create({ userId, tokenHash: hash, expiresAt });
   });
-  await redis.sadd(userSessionsKey(userId), hash);
+  await redis
+    .multi()
+    .sadd(userSessionsKey(userId), hash)
+    .expire(userSessionsKey(userId), SESSION_TTL_SECONDS)
+    .exec();
   return { token, hash };
 }
 
-async function invalidateAllUserSessions(redis: Redis, userId: string): Promise<void> {
+export async function invalidateUserSessionCache(redis: Redis, userId: string): Promise<void> {
   const hashes = await redis.smembers(userSessionsKey(userId));
   if (hashes.length > 0) {
     await redis.del(...hashes.map(sessionKey));
@@ -66,39 +75,54 @@ async function invalidateAllUserSessions(redis: Redis, userId: string): Promise<
   await redis.del(userSessionsKey(userId));
 }
 
+export async function invalidateRevokedUserSessions(redis: Redis, userId: string): Promise<void> {
+  const hashes = await redis.smembers(userSessionsKey(userId));
+  const pipeline = redis.multi();
+  for (const hash of hashes) {
+    pipeline.setex(revokedSessionKey(hash), SESSION_REVOCATION_WINDOW_SECONDS, '1');
+    pipeline.del(sessionKey(hash));
+  }
+  pipeline.del(userSessionsKey(userId));
+  await pipeline.exec();
+}
+
 export async function revokeSessionByHash(
-  pool: Pool,
+  pool: DatabasePool,
   redis: Redis,
   tokenHash: string,
 ): Promise<void> {
   await withSystemTransaction(pool, async (ctx) => {
-    const dal = createDal(ctx);
+    const dal = createSystemDal(ctx);
     const session = await dal.sessions.findByTokenHash(tokenHash);
     if (session) {
       await dal.sessions.revokeById(session.id);
     }
   });
-  await redis.del(sessionKey(tokenHash));
+  await redis
+    .multi()
+    .setex(revokedSessionKey(tokenHash), SESSION_REVOCATION_WINDOW_SECONDS, '1')
+    .del(sessionKey(tokenHash))
+    .exec();
 }
 
 export async function revokeAllSessionsForUser(
-  pool: Pool,
+  pool: DatabasePool,
   redis: Redis,
   userId: string,
 ): Promise<void> {
   await withSystemTransaction(pool, async (ctx) => {
-    const dal = createDal(ctx);
+    const dal = createSystemDal(ctx);
     await dal.sessions.revokeAllForUser(userId);
   });
-  await invalidateAllUserSessions(redis, userId);
+  await invalidateRevokedUserSessions(redis, userId);
 }
 
 async function loadSessionFromDb(
-  pool: Pool,
+  pool: DatabasePool,
   tokenHash: string,
 ): Promise<SessionCache | undefined> {
   return withSystemTransaction(pool, async (ctx) => {
-    const dal = createDal(ctx);
+    const dal = createSystemDal(ctx);
     const session = await dal.sessions.findByTokenHash(tokenHash);
     if (!session || session.revoked_at || session.expires_at < new Date()) {
       return undefined;
@@ -111,6 +135,7 @@ async function loadSessionFromDb(
     return {
       userId: user.id,
       email: user.email,
+      sessionExpiresAt: session.expires_at.toISOString(),
       memberships: memberships.map((m) => ({
         id: m.id,
         orgId: m.org_id,
@@ -122,23 +147,42 @@ async function loadSessionFromDb(
 }
 
 async function getSessionCache(
-  pool: Pool,
+  pool: DatabasePool,
   redis: Redis,
   tokenHash: string,
 ): Promise<SessionCache | undefined> {
+  if (await redis.exists(revokedSessionKey(tokenHash))) {
+    return undefined;
+  }
   const cached = await redis.get(sessionKey(tokenHash));
   if (cached) {
-    return JSON.parse(cached) as SessionCache;
+    const parsed = JSON.parse(cached) as SessionCache;
+    if (new Date(parsed.sessionExpiresAt).getTime() <= Date.now()) {
+      await redis.del(sessionKey(tokenHash));
+      return undefined;
+    }
+    return parsed;
   }
   const fromDb = await loadSessionFromDb(pool, tokenHash);
   if (fromDb) {
-    await redis.setex(sessionKey(tokenHash), CACHE_TTL_SECONDS, JSON.stringify(fromDb));
+    if (await redis.exists(revokedSessionKey(tokenHash))) {
+      return undefined;
+    }
+    const remainingSeconds = Math.max(
+      1,
+      Math.floor((new Date(fromDb.sessionExpiresAt).getTime() - Date.now()) / 1000),
+    );
+    await redis.setex(
+      sessionKey(tokenHash),
+      Math.min(SESSION_REVOCATION_WINDOW_SECONDS, remainingSeconds),
+      JSON.stringify(fromDb),
+    );
   }
   return fromDb;
 }
 
 export async function resolveAuthContext(
-  pool: Pool,
+  pool: DatabasePool,
   redis: Redis,
   tokenHash: string,
   requestedOrgId: string | undefined,
@@ -168,11 +212,8 @@ export async function resolveAuthContext(
 }
 
 export async function extractSessionToken(req: Request): Promise<string | undefined> {
-  const signed = req.signedCookies[SESSION_COOKIE] as string | undefined;
-  if (signed) {
-    return signed;
-  }
-  return req.cookies[SESSION_COOKIE] as string | undefined;
+  const signed = req.signedCookies[SESSION_COOKIE] as unknown;
+  return typeof signed === 'string' ? signed : undefined;
 }
 
 export function setSessionCookie(res: Response, token: string): void {
@@ -195,24 +236,32 @@ export function clearSessionCookie(res: Response): void {
 }
 
 export async function registerUser(
-  pool: Pool,
+  pool: DatabasePool,
   redis: Redis,
   input: { email: string; password: string; displayName?: string | undefined },
 ): Promise<{ userId: string; orgId: string; token: string }> {
   const passwordHash = await hashPassword(input.password);
   const { userId, orgId } = await withSystemTransaction(pool, async (ctx) => {
-    const dal = createDal(ctx);
+    const dal = createSystemDal(ctx);
     const user = await dal.users.create({
       email: input.email,
       passwordHash,
       displayName: input.displayName ?? null,
     });
     const org = await dal.organizations.create(`${input.email}'s organization`);
-    await dal.memberships.create({
+    const membership = await dal.memberships.create({
       orgId: org.id,
       userId: user.id,
       role: 'administrator',
       status: 'active',
+    });
+    await dal.audit.create({
+      orgId: org.id,
+      actorUserId: user.id,
+      action: 'membership.create',
+      targetType: 'membership',
+      targetId: membership.id,
+      metadata: { role: 'administrator', bootstrap: true },
     });
     // Seed a zero balance so credit operations have a row to update atomically.
     await ctx.query(
@@ -226,15 +275,16 @@ export async function registerUser(
 }
 
 export async function loginUser(
-  pool: Pool,
+  pool: DatabasePool,
   redis: Redis,
   input: { email: string; password: string },
 ): Promise<{ userId: string; token: string } | undefined> {
   const user = await withSystemTransaction(pool, async (ctx) => {
-    const dal = createDal(ctx);
+    const dal = createSystemDal(ctx);
     return dal.users.findByEmail(input.email);
   });
   if (!user) {
+    await hashPassword(input.password);
     return undefined;
   }
   const valid = await verifyPassword(input.password, user.password_hash);

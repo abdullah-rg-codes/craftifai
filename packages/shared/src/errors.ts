@@ -66,5 +66,9 @@ export function idempotencyConflict(): AppError {
 }
 
 export function idempotencyInProgress(): AppError {
-  return new AppError('IDEMPOTENCY_IN_PROGRESS', 'Request with this idempotency key is already in progress', 409);
+  return new AppError(
+    'IDEMPOTENCY_IN_PROGRESS',
+    'Request with this idempotency key is already in progress',
+    409,
+  );
 }

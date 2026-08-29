@@ -1,5 +1,7 @@
 import type { QueryResultRow } from 'pg';
-import type { TransactionContext } from './transaction.js';
+import type { OrgTransactionContext, SystemTransactionContext } from './transaction.js';
+
+type TransactionContext = OrgTransactionContext | SystemTransactionContext;
 
 export interface DbUser {
   id: string;
@@ -32,6 +34,11 @@ export interface DbMembership {
   status: 'active' | 'suspended';
   created_at: Date;
   updated_at: Date;
+}
+
+export interface DbMembershipWithUser extends DbMembership {
+  email: string;
+  display_name: string | null;
 }
 
 export interface DbInvitation {
@@ -75,7 +82,7 @@ async function many<T extends QueryResultRow>(
   return result.rows;
 }
 
-export function createDal(ctx: TransactionContext) {
+function createDal(ctx: TransactionContext) {
   return {
     users: {
       async create(input: {
@@ -146,40 +153,54 @@ export function createDal(ctx: TransactionContext) {
       async findById(id: string): Promise<DbMembership | undefined> {
         return one<DbMembership>(ctx, 'SELECT * FROM memberships WHERE id = $1', [id]);
       },
-      async findByOrgAndUser(
-        orgId: string,
-        userId: string,
-      ): Promise<DbMembership | undefined> {
+      async findByOrgAndUser(orgId: string, userId: string): Promise<DbMembership | undefined> {
         return one<DbMembership>(
           ctx,
           'SELECT * FROM memberships WHERE org_id = $1 AND user_id = $2',
           [orgId, userId],
         );
       },
+      async findByOrgAndEmail(orgId: string, email: string): Promise<DbMembership | undefined> {
+        return one<DbMembership>(
+          ctx,
+          `SELECT m.*
+             FROM memberships m
+             JOIN users u ON u.id = m.user_id
+            WHERE m.org_id = $1 AND u.email = $2`,
+          [orgId, email],
+        );
+      },
       async listByOrgId(
         orgId: string,
         cursor: { createdAt: Date; id: string } | null,
         limit: number,
-      ): Promise<DbMembership[]> {
+      ): Promise<DbMembershipWithUser[]> {
         if (cursor) {
-          return many<DbMembership>(
-          ctx,
-          `SELECT * FROM memberships
-              WHERE org_id = $1
-                AND (created_at, id) > ($2, $3)
-              ORDER BY created_at, id
+          return many<DbMembershipWithUser>(
+            ctx,
+            `SELECT m.*, u.email, u.display_name
+               FROM memberships m
+               JOIN users u ON u.id = m.user_id
+              WHERE m.org_id = $1
+                AND (m.created_at, m.id) > ($2, $3)
+              ORDER BY m.created_at, m.id
               LIMIT $4`,
-          [orgId, cursor.createdAt, cursor.id, limit + 1],
+            [orgId, cursor.createdAt, cursor.id, limit + 1],
+          );
+        }
+        return many<DbMembershipWithUser>(
+          ctx,
+          `SELECT m.*, u.email, u.display_name
+             FROM memberships m
+             JOIN users u ON u.id = m.user_id
+            WHERE m.org_id = $1
+            ORDER BY m.created_at, m.id
+            LIMIT $2`,
+          [orgId, limit + 1],
         );
-      }
-      return many<DbMembership>(
-        ctx,
-        'SELECT * FROM memberships WHERE org_id = $1 ORDER BY created_at, id LIMIT $2',
-        [orgId, limit + 1],
-      );
-    },
-    async listByUserId(userId: string): Promise<DbMembership[]> {
-      return many<DbMembership>(ctx, 'SELECT * FROM memberships WHERE user_id = $1', [userId]);
+      },
+      async listByUserId(userId: string): Promise<DbMembership[]> {
+        return many<DbMembership>(ctx, 'SELECT * FROM memberships WHERE user_id = $1', [userId]);
       },
       async updateRole(id: string, role: 'administrator' | 'member'): Promise<void> {
         await ctx.query('UPDATE memberships SET role = $1, updated_at = now() WHERE id = $2', [
@@ -196,6 +217,14 @@ export function createDal(ctx: TransactionContext) {
       async delete(id: string): Promise<void> {
         await ctx.query('DELETE FROM memberships WHERE id = $1', [id]);
       },
+      async revokeSessionsForUser(userId: string): Promise<void> {
+        await ctx.query(
+          `UPDATE sessions
+              SET revoked_at = now()
+            WHERE user_id = $1 AND revoked_at IS NULL`,
+          [userId],
+        );
+      },
       async countActiveAdmins(orgId: string): Promise<number> {
         const row = await one<{ count: string }>(
           ctx,
@@ -206,6 +235,17 @@ export function createDal(ctx: TransactionContext) {
       },
     },
     invitations: {
+      async expirePendingForEmail(orgId: string, email: string): Promise<void> {
+        await ctx.query(
+          `UPDATE invitations
+              SET status = 'expired'
+            WHERE org_id = $1
+              AND email = $2
+              AND status = 'pending'
+              AND expires_at <= now()`,
+          [orgId, email],
+        );
+      },
       async create(input: {
         orgId: string;
         email: string;
@@ -221,7 +261,21 @@ export function createDal(ctx: TransactionContext) {
         ))!;
       },
       async findByTokenHash(tokenHash: string): Promise<DbInvitation | undefined> {
-        return one<DbInvitation>(ctx, 'SELECT * FROM invitations WHERE token_hash = $1', [tokenHash]);
+        return one<DbInvitation>(ctx, 'SELECT * FROM invitations WHERE token_hash = $1', [
+          tokenHash,
+        ]);
+      },
+      async acceptPendingByTokenHash(tokenHash: string): Promise<DbInvitation | undefined> {
+        return one<DbInvitation>(
+          ctx,
+          `UPDATE invitations
+              SET status = 'accepted'
+            WHERE token_hash = $1
+              AND status = 'pending'
+              AND expires_at > now()
+          RETURNING *`,
+          [tokenHash],
+        );
       },
       async updateStatus(
         id: string,
@@ -252,8 +306,48 @@ export function createDal(ctx: TransactionContext) {
           ],
         ))!;
       },
+      async listByOrgId(
+        orgId: string,
+        cursor: { createdAt: Date; id: string } | null,
+        limit: number,
+      ): Promise<DbAuditEvent[]> {
+        if (cursor) {
+          return many<DbAuditEvent>(
+            ctx,
+            `SELECT * FROM audit_events
+              WHERE org_id = $1
+                AND (created_at, id) < ($2, $3)
+              ORDER BY created_at DESC, id DESC
+              LIMIT $4`,
+            [orgId, cursor.createdAt, cursor.id, limit + 1],
+          );
+        }
+        return many<DbAuditEvent>(
+          ctx,
+          `SELECT * FROM audit_events
+            WHERE org_id = $1
+            ORDER BY created_at DESC, id DESC
+            LIMIT $2`,
+          [orgId, limit + 1],
+        );
+      },
     },
   };
 }
 
-export type Dal = ReturnType<typeof createDal>;
+export function createOrgDal(ctx: OrgTransactionContext) {
+  const dal = createDal(ctx);
+  return {
+    organizations: dal.organizations,
+    memberships: dal.memberships,
+    invitations: dal.invitations,
+    audit: dal.audit,
+  };
+}
+
+export function createSystemDal(ctx: SystemTransactionContext) {
+  return createDal(ctx);
+}
+
+export type OrgDal = ReturnType<typeof createOrgDal>;
+export type SystemDal = ReturnType<typeof createSystemDal>;

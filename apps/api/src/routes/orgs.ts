@@ -1,7 +1,6 @@
 import { Router, type Request } from 'express';
-import type { Pool } from 'pg';
 import type { Redis } from 'ioredis';
-import { withTransaction, createDal } from '@craftifai/db';
+import { withTransaction, createOrgDal, type DatabasePool } from '@craftifai/db';
 import { notFound } from '@craftifai/shared';
 import type { Logger } from '../logger.js';
 import type { AuthContext } from '../auth.js';
@@ -9,7 +8,7 @@ import { asyncHandler } from '../errors.js';
 
 export function buildOrgsRouter(
   _logger: Logger,
-  pool: Pool,
+  pool: DatabasePool,
   _redis: Redis,
   getAuth: (req: Request) => AuthContext | undefined,
 ): Router {
@@ -23,7 +22,7 @@ export function buildOrgsRouter(
         throw notFound('Organization not found');
       }
       const org = await withTransaction(pool, auth.orgId, async (ctx) => {
-        const dal = createDal(ctx);
+        const dal = createOrgDal(ctx);
         return dal.organizations.findById(auth.orgId);
       });
       if (!org) {
