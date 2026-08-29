@@ -18,7 +18,7 @@ import {
   requireAdmin,
 } from '../auth.js';
 import { asyncHandler } from '../errors.js';
-import type { DbMembership } from '@craftifai/db';
+import type { DbMembershipWithUser } from '@craftifai/db';
 import type { OrgDal } from '@craftifai/db';
 
 const inviteSchema = z.object({
@@ -69,19 +69,19 @@ export async function auditMembershipChange(
   });
 }
 
-function encodeCursor(membership: DbMembership): string {
+function encodeCursor(membership: DbMembershipWithUser): string {
   const payload = JSON.stringify({
-    createdAt: membership.created_at.toISOString(),
+    createdAt: membership.cursor_created_at,
     id: membership.id,
   });
   return Buffer.from(payload).toString('base64url');
 }
 
-function decodeCursor(cursor: string): { createdAt: Date; id: string } {
+function decodeCursor(cursor: string): { createdAt: string; id: string } {
   try {
     const payload = Buffer.from(cursor, 'base64url').toString('utf8');
     const parsed = cursorSchema.parse(JSON.parse(payload) as unknown);
-    return { createdAt: new Date(parsed.createdAt), id: parsed.id };
+    return { createdAt: parsed.createdAt, id: parsed.id };
   } catch {
     throw new AppError('VALIDATION', 'Invalid cursor', 400);
   }

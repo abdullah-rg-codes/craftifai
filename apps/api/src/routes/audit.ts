@@ -16,17 +16,15 @@ const cursorSchema = z.object({
   id: z.string().uuid(),
 });
 
-function encodeCursor(createdAt: Date, id: string): string {
-  return Buffer.from(JSON.stringify({ createdAt: createdAt.toISOString(), id })).toString(
-    'base64url',
-  );
+function encodeCursor(createdAt: string, id: string): string {
+  return Buffer.from(JSON.stringify({ createdAt, id })).toString('base64url');
 }
 
-function decodeCursor(value: string): { createdAt: Date; id: string } {
+function decodeCursor(value: string): { createdAt: string; id: string } {
   try {
     const decoded = Buffer.from(value, 'base64url').toString('utf8');
     const parsed = cursorSchema.parse(JSON.parse(decoded) as unknown);
-    return { createdAt: new Date(parsed.createdAt), id: parsed.id };
+    return { createdAt: parsed.createdAt, id: parsed.id };
   } catch {
     throw validation('Invalid cursor');
   }
@@ -65,7 +63,7 @@ export function buildAuditRouter(
           metadata: event.metadata,
           created_at: event.created_at,
         })),
-        next_cursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
+        next_cursor: hasMore && last ? encodeCursor(last.cursor_created_at, last.id) : null,
       });
     }),
   );

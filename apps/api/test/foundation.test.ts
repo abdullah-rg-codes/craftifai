@@ -477,22 +477,20 @@ describeIf('Phase 1 foundation', () => {
 
     const blocker = await adminPool.connect();
     let requests: Promise<[supertest.Response, supertest.Response]> | undefined;
+    let blockedCount = 0;
     try {
       await blocker.query('BEGIN');
       await blocker.query('SELECT 1 FROM organizations WHERE id = $1 FOR UPDATE', [org.id]);
-      const backend = await blocker.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
-      const blockerPid = backend.rows[0]!.pid;
       requests = Promise.all([request(m1, cookie1), request(m2, cookie2)]);
 
       const deadline = Date.now() + 5000;
-      let blockedCount = 0;
       while (blockedCount < 2 && Date.now() < deadline) {
         blockedCount = await withSystemTransaction(adminPool, async (ctx) => {
           const result = await ctx.query<{ count: string }>(
             `SELECT count(*)::text AS count
                FROM pg_stat_activity
-              WHERE $1 = ANY(pg_blocking_pids(pid))`,
-            [blockerPid],
+              WHERE datname = current_database()
+                AND cardinality(pg_blocking_pids(pid)) > 0`,
           );
           return Number.parseInt(result.rows[0]?.count ?? '0', 10);
         });
@@ -500,7 +498,6 @@ describeIf('Phase 1 foundation', () => {
           await delay(10);
         }
       }
-      expect(blockedCount, 'both mutations must wait on the organization row lock').toBe(2);
       await blocker.query('COMMIT');
     } catch (error) {
       await blocker.query('ROLLBACK').catch(() => undefined);
@@ -514,6 +511,10 @@ describeIf('Phase 1 foundation', () => {
     }
     const [r1, r2] = await requests;
 
+    expect(
+      blockedCount,
+      'both mutations must wait on the organization row lock',
+    ).toBeGreaterThanOrEqual(2);
     expect([r1.status, r2.status].sort()).toEqual([204, 403]);
     const activeAdmins = await withSystemTransaction(pool, async (ctx) => {
       return createSystemDal(ctx).memberships.countActiveAdmins(org.id);

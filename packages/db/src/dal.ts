@@ -39,6 +39,7 @@ export interface DbMembership {
 export interface DbMembershipWithUser extends DbMembership {
   email: string;
   display_name: string | null;
+  cursor_created_at: string;
 }
 
 export interface DbInvitation {
@@ -62,6 +63,10 @@ export interface DbAuditEvent {
   target_id: string | null;
   metadata: Record<string, unknown>;
   created_at: Date;
+}
+
+export interface DbAuditEventWithCursor extends DbAuditEvent {
+  cursor_created_at: string;
 }
 
 async function one<T extends QueryResultRow>(
@@ -172,17 +177,21 @@ function createDal(ctx: TransactionContext) {
       },
       async listByOrgId(
         orgId: string,
-        cursor: { createdAt: Date; id: string } | null,
+        cursor: { createdAt: string; id: string } | null,
         limit: number,
       ): Promise<DbMembershipWithUser[]> {
         if (cursor) {
           return many<DbMembershipWithUser>(
             ctx,
-            `SELECT m.*, u.email, u.display_name
+            `SELECT m.*, u.email, u.display_name,
+                    to_char(
+                      m.created_at AT TIME ZONE 'UTC',
+                      'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+                    ) AS cursor_created_at
                FROM memberships m
                JOIN users u ON u.id = m.user_id
               WHERE m.org_id = $1
-                AND (m.created_at, m.id) > ($2, $3)
+                AND (m.created_at, m.id) > ($2::timestamptz, $3)
               ORDER BY m.created_at, m.id
               LIMIT $4`,
             [orgId, cursor.createdAt, cursor.id, limit + 1],
@@ -190,7 +199,11 @@ function createDal(ctx: TransactionContext) {
         }
         return many<DbMembershipWithUser>(
           ctx,
-          `SELECT m.*, u.email, u.display_name
+          `SELECT m.*, u.email, u.display_name,
+                  to_char(
+                    m.created_at AT TIME ZONE 'UTC',
+                    'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+                  ) AS cursor_created_at
              FROM memberships m
              JOIN users u ON u.id = m.user_id
             WHERE m.org_id = $1
@@ -308,23 +321,33 @@ function createDal(ctx: TransactionContext) {
       },
       async listByOrgId(
         orgId: string,
-        cursor: { createdAt: Date; id: string } | null,
+        cursor: { createdAt: string; id: string } | null,
         limit: number,
-      ): Promise<DbAuditEvent[]> {
+      ): Promise<DbAuditEventWithCursor[]> {
         if (cursor) {
-          return many<DbAuditEvent>(
+          return many<DbAuditEventWithCursor>(
             ctx,
-            `SELECT * FROM audit_events
+            `SELECT *,
+                    to_char(
+                      created_at AT TIME ZONE 'UTC',
+                      'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+                    ) AS cursor_created_at
+               FROM audit_events
               WHERE org_id = $1
-                AND (created_at, id) < ($2, $3)
+                AND (created_at, id) < ($2::timestamptz, $3)
               ORDER BY created_at DESC, id DESC
               LIMIT $4`,
             [orgId, cursor.createdAt, cursor.id, limit + 1],
           );
         }
-        return many<DbAuditEvent>(
+        return many<DbAuditEventWithCursor>(
           ctx,
-          `SELECT * FROM audit_events
+          `SELECT *,
+                  to_char(
+                    created_at AT TIME ZONE 'UTC',
+                    'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+                  ) AS cursor_created_at
+             FROM audit_events
             WHERE org_id = $1
             ORDER BY created_at DESC, id DESC
             LIMIT $2`,
