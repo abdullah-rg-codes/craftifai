@@ -15,3 +15,4 @@ export type Role = 'administrator' | 'member';
 export type MembershipStatus = 'active' | 'suspended';
 
 export * from './password.js';
+export * from './errors.js';
