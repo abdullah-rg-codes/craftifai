@@ -18,23 +18,23 @@ a balance update that races is a failing submission. A plain interface over a le
 that holds under 200 concurrent clients is a strong one.
 
 That inverts the usual MVP instinct, which is why it is worth being deliberate about it
-before you start. The parts that feel like infrastructure here *are* the deliverable.
+before you start. The parts that feel like infrastructure here _are_ the deliverable.
 
 ## Files
 
-| Path | What it is |
-| --- | --- |
-| `docs/assignment.md` | The brief, transcribed from the PDF for `@`-referencing |
-| `docs/known-traps.md` | 20 failure modes that pass manual tests and fail the grader |
-| `prompts/00-start.md` | The starting prompt — design brief, no code |
-| `prompts/01-foundation.md` | Schema, tenant isolation, auth, roles, audit |
-| `prompts/02-credit-core.md` | Ledger, reservations, idempotency, webhooks, reconciliation |
-| `prompts/03-model-gateway.md` | Mock model, encryption, SSRF, the inference path |
-| `prompts/04-web-app.md` | Admin and member interfaces |
-| `prompts/05-onprem.md` | Compose package, two replicas, offline, backup and restore |
-| `prompts/06-load-test.md` | Load test and report |
-| `prompts/07-docs-and-review.md` | Requirement audit, the five documents, clean-clone check |
-| `rules/project.mdc` | Always-on rules for the assignment repo |
+| Path                            | What it is                                                  |
+| ------------------------------- | ----------------------------------------------------------- |
+| `docs/assignment.md`            | The brief, transcribed from the PDF for `@`-referencing     |
+| `docs/known-traps.md`           | 20 failure modes that pass manual tests and fail the grader |
+| `prompts/00-start.md`           | The starting prompt — design brief, no code                 |
+| `prompts/01-foundation.md`      | Schema, tenant isolation, auth, roles, audit                |
+| `prompts/02-credit-core.md`     | Ledger, reservations, idempotency, webhooks, reconciliation |
+| `prompts/03-model-gateway.md`   | Mock model, encryption, SSRF, the inference path            |
+| `prompts/04-web-app.md`         | Admin and member interfaces                                 |
+| `prompts/05-onprem.md`          | Compose package, two replicas, offline, backup and restore  |
+| `prompts/06-load-test.md`       | Load test and report                                        |
+| `prompts/07-docs-and-review.md` | Requirement audit, the five documents, clean-clone check    |
+| `rules/project.mdc`             | Always-on rules for the assignment repo                     |
 
 ## Setup
 

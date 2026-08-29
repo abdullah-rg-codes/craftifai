@@ -79,7 +79,7 @@ every concurrency test; it is one line and it catches an entire class of bug.
 
 **8. 403 where it should be 404.** Returning forbidden for another organization's
 resource and not-found for a nonexistent one lets an attacker enumerate which identifiers
-exist. The criterion says a user must not be able to *infer the existence* of another
+exist. The criterion says a user must not be able to _infer the existence_ of another
 organization's resources. Same response either way.
 
 **9. Row-level security without `SET LOCAL`.** With RLS driven by a session variable, a

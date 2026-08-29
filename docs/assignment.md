@@ -43,16 +43,16 @@ intended to be a simple CRUD application.
 Your implementation will be tested at a smaller scale, but the architecture should
 support a future deployment with approximately:
 
-| Metric | Target |
-| --- | --- |
-| Registered users | 1,000,000 |
-| Customer organizations | 50,000 |
-| Daily active users | 100,000 |
-| Concurrent active sessions | 20,000 |
-| Peak control-plane traffic | 1,000 requests/second |
-| Peak new AI requests | 300 requests/second |
-| API availability target | 99.9% |
-| Control-plane overhead | p95 below 150 ms, excluding model latency |
+| Metric                     | Target                                    |
+| -------------------------- | ----------------------------------------- |
+| Registered users           | 1,000,000                                 |
+| Customer organizations     | 50,000                                    |
+| Daily active users         | 100,000                                   |
+| Concurrent active sessions | 20,000                                    |
+| Peak control-plane traffic | 1,000 requests/second                     |
+| Peak new AI requests       | 300 requests/second                       |
+| API availability target    | 99.9%                                     |
+| Control-plane overhead     | p95 below 150 ms, excluding model latency |
 
 You are not expected to run one million users locally. You are expected to show how
 your implementation can evolve to that scale and provide evidence for your design
@@ -273,23 +273,23 @@ important bottlenecks and explain the consistency model.
 
 ## 5. Mandatory Acceptance Criteria
 
-| Area | Acceptance criterion |
-| --- | --- |
-| Tenant isolation | A user from Organization A cannot read, modify, infer the existence of, or act upon resources belonging to Organization B. |
-| Role enforcement | Member accounts cannot call administration or billing APIs directly. |
-| Last administrator | The final active administrator cannot be removed, suspended, or demoted. |
-| Credit concurrency | Concurrent requests cannot produce a negative balance or consume more credits than are available. |
-| Purchase idempotency | Repeated and concurrent delivery of the same billing event changes the balance once. |
-| Inference idempotency | Repeated or concurrent use of the same idempotency key never causes duplicate charging. |
-| Provider failures | Timeouts, 429 responses, 500 responses, and malformed provider responses are handled without leaking reserved credits. |
-| Restart recovery | An interrupted request or stale reservation is detected and safely reconciled after restart. |
-| Secret handling | Model credentials and billing secrets do not appear in API responses, frontend state, source control, or application logs. |
-| Multi-instance operation | Correctness is preserved when at least two API instances are active. |
-| On-premises operation | The complete system functions without external internet access and uses the configured customer model. |
-| Data persistence | Users, memberships, balances, model configuration, and audit history survive restarts. |
-| Large collections | Member, transaction, usage, and audit APIs are paginated and do not load unbounded datasets. |
-| Observability | Important failures can be understood from logs and metrics without exposing customer prompts or secrets. |
-| Reproducibility | The project runs from a clean clone using the submitted instructions. |
+| Area                     | Acceptance criterion                                                                                                       |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Tenant isolation         | A user from Organization A cannot read, modify, infer the existence of, or act upon resources belonging to Organization B. |
+| Role enforcement         | Member accounts cannot call administration or billing APIs directly.                                                       |
+| Last administrator       | The final active administrator cannot be removed, suspended, or demoted.                                                   |
+| Credit concurrency       | Concurrent requests cannot produce a negative balance or consume more credits than are available.                          |
+| Purchase idempotency     | Repeated and concurrent delivery of the same billing event changes the balance once.                                       |
+| Inference idempotency    | Repeated or concurrent use of the same idempotency key never causes duplicate charging.                                    |
+| Provider failures        | Timeouts, 429 responses, 500 responses, and malformed provider responses are handled without leaking reserved credits.     |
+| Restart recovery         | An interrupted request or stale reservation is detected and safely reconciled after restart.                               |
+| Secret handling          | Model credentials and billing secrets do not appear in API responses, frontend state, source control, or application logs. |
+| Multi-instance operation | Correctness is preserved when at least two API instances are active.                                                       |
+| On-premises operation    | The complete system functions without external internet access and uses the configured customer model.                     |
+| Data persistence         | Users, memberships, balances, model configuration, and audit history survive restarts.                                     |
+| Large collections        | Member, transaction, usage, and audit APIs are paginated and do not load unbounded datasets.                               |
+| Observability            | Important failures can be understood from logs and metrics without exposing customer prompts or secrets.                   |
+| Reproducibility          | The project runs from a clean clone using the submitted instructions.                                                      |
 
 **A smaller implementation that satisfies these invariants will score higher than a
 larger implementation that only works on the happy path.**
@@ -327,20 +327,20 @@ than presenting a very high requests-per-second number.
 
 Submit a Git repository containing:
 
-| Deliverable | Expected content |
-| --- | --- |
-| `README.md` | Clean-clone setup, run, test, load-test, and demo instructions |
-| `ARCHITECTURE.md` | Components, data flow, consistency model, failure handling, and one-million-user scaling plan |
-| `SECURITY.md` | Threat model, tenant-isolation strategy, secret handling, webhook security, and SSRF considerations |
-| `OPERATIONS.md` | Health checks, metrics, backup, restore, upgrade, rollback, and incident procedures |
-| `AI_USAGE.md` | AI tools used, areas substantially generated, validation performed, and examples of incorrect AI output that you corrected |
-| `openapi.yaml` or equivalent | API contract |
-| Database migrations | Reproducible, versioned schema |
-| Automated tests | Unit, integration, concurrency, and failure tests |
-| Load-test report | Reproducible script and results |
-| On-premises package | Docker Compose, configuration examples, and offline-run instructions |
-| Architecture diagram | SaaS and on-premises views |
-| Decision records | At least three meaningful architecture decisions and rejected alternatives |
+| Deliverable                  | Expected content                                                                                                           |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `README.md`                  | Clean-clone setup, run, test, load-test, and demo instructions                                                             |
+| `ARCHITECTURE.md`            | Components, data flow, consistency model, failure handling, and one-million-user scaling plan                              |
+| `SECURITY.md`                | Threat model, tenant-isolation strategy, secret handling, webhook security, and SSRF considerations                        |
+| `OPERATIONS.md`              | Health checks, metrics, backup, restore, upgrade, rollback, and incident procedures                                        |
+| `AI_USAGE.md`                | AI tools used, areas substantially generated, validation performed, and examples of incorrect AI output that you corrected |
+| `openapi.yaml` or equivalent | API contract                                                                                                               |
+| Database migrations          | Reproducible, versioned schema                                                                                             |
+| Automated tests              | Unit, integration, concurrency, and failure tests                                                                          |
+| Load-test report             | Reproducible script and results                                                                                            |
+| On-premises package          | Docker Compose, configuration examples, and offline-run instructions                                                       |
+| Architecture diagram         | SaaS and on-premises views                                                                                                 |
+| Decision records             | At least three meaningful architecture decisions and rejected alternatives                                                 |
 
 The Git history should contain meaningful incremental commits rather than a single
 final code dump.
