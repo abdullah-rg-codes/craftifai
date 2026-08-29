@@ -1,0 +1,61 @@
+---
+alwaysApply: true
+---
+
+# CraftifAI assignment — project rules
+
+Copy to `.cursor/rules/project.mdc` in the assignment repo. This is prepended to every
+request, so it stays short deliberately. Detail belongs in the phase prompts.
+
+## What this is
+
+A senior take-home: a multi-tenant AI control plane. Full brief in `@docs/assignment.md`.
+
+It is graded on invariants, not features. A smaller implementation that holds under
+concurrency scores higher than a larger one that works on the happy path. When scope and
+correctness compete, correctness wins and the scope gets documented as a deliberate cut.
+
+Every decision has to be defensible out loud afterwards. Explain reasoning in commit
+messages and decision records, not in code comments.
+
+## Stack — fixed
+
+TypeScript `strict`, Node.js, React/Next.js, PostgreSQL as the authoritative store,
+Redis for rate limits and leases, Docker Compose, versioned SQL migrations.
+
+Forbidden on the production path: hosted identity providers, hosted databases, real
+payment providers, hosted queues or caches, public CDNs, any internet-accessible runtime
+dependency. Do not add a dependency without saying why first.
+
+## Non-negotiable invariants
+
+Nothing in application-process memory is load-bearing for credit correctness,
+idempotency, session revocation, rate limiting, or background-job ownership. Assume two
+replicas always. An in-memory map or a process-local mutex protecting anything financial
+is a bug, not a simplification.
+
+Every query touching tenant data is organization-scoped, enforced server side. A
+cross-tenant read returns not-found, never forbidden — a distinct forbidden response
+confirms the resource exists.
+
+No balance write without a ledger entry in the same transaction. Nothing financial is
+updated in place in a way that loses history.
+
+No database transaction is held open across an outbound network call.
+
+Model credentials and billing secrets never appear in API responses, frontend state, logs,
+or source control. Prompts and completions are not logged by default.
+
+## Working rules
+
+- No `TODO`, no stubbed bodies, no dead endpoints. Unbuilt means absent.
+- Concurrency-sensitive code is decided by a database constraint or lock, never by
+  check-then-act in application code.
+- Tests for credits, idempotency, and concurrency run against real PostgreSQL. Never
+  SQLite, never a mocked repository. Deterministic — no fixed sleeps as synchronization.
+- Every list endpoint is paginated with a stable cursor. Nothing returns an unbounded set.
+- Meaningful incremental commits. Git history is graded.
+- State assumptions when the brief is ambiguous, pick the smaller interpretation, and flag
+  it. Do not ask, and do not silently expand scope.
+- If you realize something you built earlier is wrong, say so directly. Those corrections
+  are a required deliverable in `AI_USAGE.md`.
