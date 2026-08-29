@@ -1,0 +1,34 @@
+{
+  "name": "@craftifai/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "dev": "tsx watch ./src/index.ts",
+    "start": "node ./dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@craftifai/db": "workspace:*",
+    "@craftifai/shared": "workspace:*",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.1.0",
+    "ioredis": "^5.6.1",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.8",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

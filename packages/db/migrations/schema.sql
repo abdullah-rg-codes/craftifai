@@ -1,0 +1,1 @@
+-- Dbmate schema dump placeholder. Run `pnpm db:migrate` to populate after migrations exist.

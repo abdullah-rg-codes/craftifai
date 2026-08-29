@@ -1,0 +1,25 @@
+{
+  "name": "@craftifai/db",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "create": "tsx ./src/cli.ts createDatabase",
+    "drop": "tsx ./src/cli.ts dropDatabase",
+    "migrate": "dbmate --migrations-dir ./migrations --schema-file ./migrations/schema.sql --wait up",
+    "migrate:down": "dbmate --migrations-dir ./migrations --schema-file ./migrations/schema.sql down"
+  },
+  "dependencies": {
+    "pg": "^8.15.6"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.3",
+    "dbmate": "^2.26.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

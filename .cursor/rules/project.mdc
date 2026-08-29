@@ -59,3 +59,16 @@ or source control. Prompts and completions are not logged by default.
   it. Do not ask, and do not silently expand scope.
 - If you realize something you built earlier is wrong, say so directly. Those corrections
   are a required deliverable in `AI_USAGE.md`.
+
+## Commit discipline (Abdullah — standing instruction)
+
+- The commit unit is a logical seam that leaves the repo building with tests green. Not
+  per-file, not per-hour, and not a phase dump.
+- Every commit message carries the why, naming the invariant or decision where one exists.
+  No `wip`, no `fix`, no `update`.
+- Red-green where natural: failing test first, then the implementation that makes it pass.
+- Corrections are their own commits with plain messages explaining what was wrong and why
+  the replacement is better. Each is a candidate for `AI_USAGE.md`.
+- Never commit `.env`, secrets, keys, tokens, endpoints, or `node_modules`.
+- The phase-end commit is the seal after Abdullah reviews the evidence and says go; mid-phase
+  commits remain the norm per the working rules above.
