@@ -18,11 +18,11 @@
     "@craftifai/shared": "workspace:*",
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
-    "ioredis": "^5.6.1",
-    "pino": "^9.6.0",
+    "ioredis": "^6.0.0",
+    "pino": "^10.3.1",
     "pino-pretty": "^13.0.0",
     "tsx": "^4.19.4",
-    "zod": "^3.25.0"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.8",
