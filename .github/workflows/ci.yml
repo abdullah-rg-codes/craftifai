@@ -146,3 +146,40 @@ jobs:
           docker compose exec -T api-1 node -e "fetch('http://mock-model:8081/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
           docker compose exec -T api-1 node -e "fetch('https://example.com',{signal:AbortSignal.timeout(3000)}).then(()=>process.exit(1)).catch(()=>process.exit(0))"
           docker compose down -v
+
+  compose-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      POSTGRES_ADMIN_USER: craftifai_owner
+      POSTGRES_ADMIN_PASSWORD: ci-admin-password-not-real
+      POSTGRES_APP_PASSWORD: ci-app-password-not-real
+      POSTGRES_DB: craftifai
+      SESSION_SECRET: ci-session-secret-not-real
+      WEBHOOK_SECRET: ci-webhook-secret-not-real
+      MOCK_MODEL_API_KEY: test-model-secret
+      COOKIE_SECURE: 'false'
+      DATABASE_ADMIN_URL: postgres://craftifai_owner:ci-admin-password-not-real@localhost:5432/craftifai?sslmode=disable
+      DATABASE_URL: postgres://craftifai_app:ci-app-password-not-real@localhost:5432/craftifai?sslmode=disable
+      REDIS_URL: redis://localhost:6379/0
+      TEST_BASE_URL: http://127.0.0.1/api
+      MOCK_MODEL_URL: http://mock-model:8081
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Derive 32-byte test encryption key
+        run: echo "ENCRYPTION_KEY_BASE64=$(printf '%s' '0123456789abcdef0123456789abcdef' | base64 -w 0)" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+        with:
+          version: 11.24.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: docker compose up --build -d postgres redis mock-model
+      - run: docker compose up --build migrate
+      - run: docker compose up --build -d --wait --wait-timeout 180 proxy
+      - run: pnpm load:test
+      - if: always()
+        run: docker compose down -v

@@ -77,3 +77,13 @@ The SQL files include `migrate:down` sections. Downs that `DROP TABLE` are not a
 ## Shutdown
 
 API replicas stop accepting connections on SIGTERM, wait up to 10s for in-flight requests, then close the pool and Redis. Expired reservations are released by the 30s sweeper (`pg_try_advisory_lock` so only one replica sweeps).
+
+## Load test
+
+With the stack up (`docker compose up --build -d`):
+
+```bash
+TEST_BASE_URL=http://127.0.0.1/api pnpm load:test
+```
+
+Needs the same secrets as Compose plus `DATABASE_ADMIN_URL` (published Postgres). The harness drives 200 concurrent clients, samples balances during the run, and fails if a balance goes negative, ledger sums drift, expired reservations dangle, or HTTP 200 inferences do not match settlement rows. Report: [load/REPORT.md](../load/REPORT.md).

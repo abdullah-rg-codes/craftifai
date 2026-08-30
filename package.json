@@ -27,7 +27,8 @@
     "compose:up": "docker compose up --build -d",
     "compose:down": "docker compose down -v",
     "compose:logs": "docker compose logs -f",
-    "test:compose": "vitest run --fileParallelism=false apps/api/test/foundation.test.ts apps/api/test/credits.test.ts apps/api/test/gateway.test.ts apps/api/test/compose.lb.test.ts"
+    "test:compose": "vitest run --fileParallelism=false apps/api/test/foundation.test.ts apps/api/test/credits.test.ts apps/api/test/gateway.test.ts apps/api/test/compose.lb.test.ts",
+    "load:test": "pnpm --filter @craftifai/api exec tsx ../../load/harness.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.26.0",
