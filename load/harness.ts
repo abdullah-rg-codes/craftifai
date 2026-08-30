@@ -275,9 +275,9 @@ async function main(): Promise<void> {
     await dal.modelConfigurations.upsert({
       orgId: failTimeout.orgId,
       deploymentMode: 'saas',
-      endpointUrl: `${mockUrl}/v1/chat/completions?behavior=slow&latency_ms=500`,
+      endpointUrl: `${mockUrl}/v1/chat/completions?behavior=slow&latency_ms=5000`,
       modelName: 'mock-model',
-      timeoutMs: 80,
+      timeoutMs: 1000,
       credentialCiphertext: encrypted.ciphertext,
       credentialKeyVersion: encrypted.keyVersion,
     });
@@ -543,5 +543,8 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error(message);
+  if (error instanceof Error && error.cause) {
+    console.error(error.cause);
+  }
   process.exit(1);
 });
