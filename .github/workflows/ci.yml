@@ -10,7 +10,7 @@ jobs:
   typecheck-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
         with:
@@ -33,7 +33,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Trivy filesystem (CRITICAL/HIGH library CVEs)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -110,7 +110,7 @@ jobs:
       SESSION_SECRET: ci-session-secret-not-real
       WEBHOOK_SECRET: ci-webhook-secret-not-real
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Derive 32-byte test encryption key
         run: echo "ENCRYPTION_KEY_BASE64=$(printf '%s' '0123456789abcdef0123456789abcdef' | base64 -w 0)" >> "$GITHUB_ENV"
 
@@ -142,7 +142,7 @@ jobs:
       WEBHOOK_SECRET: ci-webhook-secret-not-real
       MOCK_MODEL_API_KEY: test-model-secret
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Derive 32-byte test encryption key
         run: echo "ENCRYPTION_KEY_BASE64=$(printf '%s' '0123456789abcdef0123456789abcdef' | base64 -w 0)" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
@@ -173,7 +173,7 @@ jobs:
       TEST_BASE_URL: http://127.0.0.1/api
       MOCK_MODEL_URL: http://mock-model:8081
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Derive 32-byte test encryption key
         run: echo "ENCRYPTION_KEY_BASE64=$(printf '%s' '0123456789abcdef0123456789abcdef' | base64 -w 0)" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
@@ -221,7 +221,7 @@ jobs:
       TEST_BASE_URL: http://127.0.0.1/api
       MOCK_MODEL_URL: http://mock-model:8081
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Derive 32-byte test encryption key
         run: echo "ENCRYPTION_KEY_BASE64=$(printf '%s' '0123456789abcdef0123456789abcdef' | base64 -w 0)" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
