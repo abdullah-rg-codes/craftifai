@@ -1,3 +1,6 @@
-// Shared test setup placeholder. Phase 1 will add a lazily-initialized connection
-// pool helper that verifies DATABASE_URL and REDIS_URL only when tests actually
-// touch the database, keeping non-DB tests (like password hashing) runnable.
+if (!process.env.ENCRYPTION_KEY_BASE64) {
+  process.env.ENCRYPTION_KEY_BASE64 = Buffer.alloc(32, 9).toString('base64');
+}
+if (!process.env.SESSION_SECRET) {
+  process.env.SESSION_SECRET = 'unit-test-session-secret';
+}

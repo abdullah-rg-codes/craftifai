@@ -39,6 +39,12 @@ export function createErrorHandler(logger: Logger): ErrorRequestHandler {
       return;
     }
     if (err instanceof AppError) {
+      if (err.code === 'RATE_LIMITED') {
+        const retryAfter = err.details?.retryAfterSeconds;
+        if (typeof retryAfter === 'number') {
+          res.setHeader('Retry-After', String(retryAfter));
+        }
+      }
       logger.warn(
         {
           code: err.code,

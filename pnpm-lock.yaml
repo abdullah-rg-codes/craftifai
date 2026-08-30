@@ -66,6 +66,9 @@ importers:
         specifier: ^3.25.0
         version: 3.25.76
     devDependencies:
+      '@craftifai/mock-model':
+        specifier: workspace:*
+        version: link:../mock-model
       '@types/cookie-parser':
         specifier: ^1.4.8
         version: 1.4.10(@types/express@5.0.6)
@@ -93,6 +96,25 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(happy-dom@17.6.3)(supports-color@7.2.0)(tsx@4.23.12)
+
+  apps/mock-model:
+    dependencies:
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1(supports-color@7.2.0)
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.1
+        version: 5.0.6
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      tsx:
+        specifier: ^4.19.4
+        version: 4.23.12
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
 
   apps/web:
     dependencies:

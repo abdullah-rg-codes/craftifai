@@ -12,6 +12,7 @@ export type AppErrorCode =
   | 'MODEL_TIMEOUT'
   | 'MODEL_UNAVAILABLE'
   | 'MODEL_MALFORMED'
+  | 'RATE_LIMITED'
   | 'INTERNAL';
 
 export class AppError extends Error {
@@ -79,4 +80,22 @@ export function webhookInvalid(message: string): AppError {
 
 export function webhookReplay(message: string): AppError {
   return new AppError('WEBHOOK_REPLAY', message, 409);
+}
+
+export function modelTimeout(message = 'Model request timed out'): AppError {
+  return new AppError('MODEL_TIMEOUT', message, 504);
+}
+
+export function modelUnavailable(message = 'Model is unavailable'): AppError {
+  return new AppError('MODEL_UNAVAILABLE', message, 502);
+}
+
+export function modelMalformed(message = 'Model returned a malformed response'): AppError {
+  return new AppError('MODEL_MALFORMED', message, 502);
+}
+
+export function rateLimited(retryAfterSeconds: number): AppError {
+  return new AppError('RATE_LIMITED', 'Rate limit exceeded', 429, {
+    retryAfterSeconds,
+  });
 }

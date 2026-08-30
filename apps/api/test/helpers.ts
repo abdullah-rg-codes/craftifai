@@ -14,6 +14,7 @@ import { hashPassword } from '@craftifai/shared';
 import { buildApp } from '../src/app.js';
 import { createLogger } from '../src/logger.js';
 import { createRedis } from '../src/redis.js';
+import { encryptCredential } from '../src/services/crypto.js';
 import type { Application } from 'express';
 import type { Redis } from 'ioredis';
 import type { DatabasePool } from '@craftifai/db';
@@ -44,8 +45,8 @@ export function runMigrations(): void {
   });
 }
 
-export function createTestApp() {
-  const logger = createLogger();
+export function createTestApp(options: { logger?: ReturnType<typeof createLogger> } = {}) {
+  const logger = options.logger ?? createLogger();
   const pool = createPool();
   const redis = createRedis();
   const adminPool = createPool({
@@ -235,6 +236,30 @@ export async function seedCredits(
       kind: 'purchase',
       deltaAvailable: credits,
       deltaReserved: 0,
+    });
+  });
+}
+
+export async function seedModelConfig(
+  adminPool: DatabasePool,
+  orgId: string,
+  options: {
+    endpointUrl: string;
+    credential: string;
+    timeoutMs?: number;
+    modelName?: string;
+  },
+): Promise<void> {
+  const encrypted = await encryptCredential(options.credential);
+  await withSystemTransaction(adminPool, async (ctx) => {
+    await createSystemDal(ctx).modelConfigurations.upsert({
+      orgId,
+      deploymentMode: 'saas',
+      endpointUrl: options.endpointUrl,
+      modelName: options.modelName ?? 'mock-model',
+      timeoutMs: options.timeoutMs ?? 5000,
+      credentialCiphertext: encrypted.ciphertext,
+      credentialKeyVersion: encrypted.keyVersion,
     });
   });
 }

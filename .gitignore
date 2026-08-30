@@ -38,6 +38,9 @@ coverage/
 # Docker volumes (used by compose, but data should not be committed)
 .volumes/
 
+# Local throwaway Postgres/Redis when Docker is unavailable
+.local-infra/
+
 # Database dumps
 *.dump
 *.sql.gz

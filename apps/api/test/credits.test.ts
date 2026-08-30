@@ -11,16 +11,19 @@ import {
   registerAndLogin,
   runMigrations,
   seedCredits,
+  seedModelConfig,
   startTestServer,
   truncateTables,
   type TestHttpResponse,
 } from './helpers.js';
+import { buildMockModelApp } from '@craftifai/mock-model/app';
 import { signWebhook } from '../src/services/billing.js';
 import { runReconciliationSweep } from '../src/services/sweeper.js';
 import { createCreditService } from '../src/services/credits.js';
 import { env } from '../src/env.js';
 
 const describeIf = hasTestDatabase() && hasTestRedis() ? describe : describe.skip;
+const MOCK_MODEL_KEY = 'test-model-secret';
 
 async function lockCreditAccount(
   client: { query: (sql: string, params?: unknown[]) => Promise<unknown> },
@@ -100,8 +103,27 @@ describeIf('Phase 2 credit core', () => {
   let redis: Awaited<ReturnType<typeof createTestApp>>['redis'];
   let serverUrl: string;
   let closeServer: () => Promise<void>;
+  let mockUrl: string;
+  let closeMock: () => Promise<void>;
+
+  async function enableModel(
+    orgId: string,
+    options: { timeoutMs?: number; behavior?: string } = {},
+  ): Promise<void> {
+    const params = new URLSearchParams({ latency_ms: '0' });
+    if (options.behavior) {
+      params.set('behavior', options.behavior);
+    }
+    await seedModelConfig(adminPool, orgId, {
+      endpointUrl: `${mockUrl}/v1/chat/completions?${params.toString()}`,
+      credential: MOCK_MODEL_KEY,
+      timeoutMs: options.timeoutMs ?? 5000,
+    });
+  }
 
   beforeAll(async () => {
+    process.env.ALLOWED_PRIVATE_CIDRS = '127.0.0.0/8';
+    process.env.MOCK_MODEL_API_KEY = MOCK_MODEL_KEY;
     runMigrations();
     const testApp = createTestApp();
     app = testApp.app;
@@ -111,6 +133,9 @@ describeIf('Phase 2 credit core', () => {
     const listening = await startTestServer(testApp.expressApp);
     serverUrl = listening.url;
     closeServer = listening.close;
+    const mock = await startTestServer(buildMockModelApp());
+    mockUrl = mock.url;
+    closeMock = mock.close;
   });
 
   beforeEach(async () => {
@@ -118,6 +143,7 @@ describeIf('Phase 2 credit core', () => {
   });
 
   afterAll(async () => {
+    await closeMock?.();
     await closeServer?.();
     await redis?.quit();
     await pool?.end();
@@ -143,6 +169,7 @@ describeIf('Phase 2 credit core', () => {
   it('reserves, settles, and releases credits through the inference endpoint', async () => {
     const admin = await registerAndLogin(app, 'inference-admin@example.com');
     await seedCredits(adminPool, admin.orgId, 10);
+    await enableModel(admin.orgId);
 
     const response = await app
       .post('/inference')
@@ -182,6 +209,7 @@ describeIf('Phase 2 credit core', () => {
   it('returns 402 and never creates a reservation when credits are insufficient', async () => {
     const admin = await registerAndLogin(app, 'poor-admin@example.com');
     await seedCredits(adminPool, admin.orgId, 1);
+    await enableModel(admin.orgId);
 
     const response = await app
       .post('/inference')
@@ -205,6 +233,7 @@ describeIf('Phase 2 credit core', () => {
   it('replays a completed inference request with the same idempotency key and body', async () => {
     const admin = await registerAndLogin(app, 'replay-admin@example.com');
     await seedCredits(adminPool, admin.orgId, 10);
+    await enableModel(admin.orgId);
 
     const first = await app
       .post('/inference')
@@ -233,6 +262,7 @@ describeIf('Phase 2 credit core', () => {
   it('conflicts when the same idempotency key is reused with a different body', async () => {
     const admin = await registerAndLogin(app, 'conflict-admin@example.com');
     await seedCredits(adminPool, admin.orgId, 10);
+    await enableModel(admin.orgId);
 
     await app
       .post('/inference')
@@ -417,6 +447,7 @@ describeIf('Phase 2 credit core', () => {
   it('reaps a stale pending idempotency key', async () => {
     const admin = await registerAndLogin(app, 'stale-key-admin@example.com');
     await seedCredits(adminPool, admin.orgId, 10);
+    await enableModel(admin.orgId);
 
     await withSystemTransaction(pool, async (ctx) => {
       const dal = createSystemDal(ctx);
@@ -445,6 +476,7 @@ describeIf('Phase 2 credit core', () => {
     const admin = await registerAndLogin(app, 'concurrent-admin@example.com');
     const credits = 5;
     await seedCredits(adminPool, admin.orgId, credits);
+    await enableModel(admin.orgId);
 
     const n = 10;
     const maxTokens = 1000;
@@ -482,6 +514,7 @@ describeIf('Phase 2 credit core', () => {
   it('concurrent identical idempotency keys produce one charge and replay the rest', async () => {
     const admin = await registerAndLogin(app, 'idempotent-admin@example.com');
     await seedCredits(adminPool, admin.orgId, 10);
+    await enableModel(admin.orgId);
 
     const n = 5;
     const maxTokens = 1000;
@@ -576,6 +609,11 @@ describeIf('Phase 2 credit core', () => {
     try {
       const admin1 = await registerAndLogin(testApp1.app, 'two-instance-admin@example.com');
       await seedCredits(testApp1.adminPool, admin1.orgId, 3);
+      await seedModelConfig(testApp1.adminPool, admin1.orgId, {
+        endpointUrl: `${mockUrl}/v1/chat/completions?latency_ms=0`,
+        credential: MOCK_MODEL_KEY,
+        timeoutMs: 5000,
+      });
 
       const login2 = await testApp2.app
         .post('/auth/login')

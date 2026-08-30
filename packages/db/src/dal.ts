@@ -144,6 +144,19 @@ export interface DbWebhookEvent {
   processed_at: Date | null;
 }
 
+export interface DbModelConfiguration {
+  org_id: string;
+  deployment_mode: 'saas' | 'onprem';
+  endpoint_url: string;
+  model_name: string;
+  credential_ciphertext: Buffer | null;
+  credential_key_version: number | null;
+  credential_updated_at: Date | null;
+  timeout_ms: number;
+  ca_bundle: Buffer | null;
+  updated_at: Date;
+}
+
 function parseCredits(value: string | number | null | undefined): number {
   if (value === null || value === undefined) return 0;
   if (typeof value === 'number') return value;
@@ -216,6 +229,24 @@ function toIdempotencyKey(row: QueryResultRow): DbIdempotencyKey {
     created_at: row.created_at as Date,
     completed_at: row.completed_at ? (row.completed_at as Date) : null,
     expires_at: row.expires_at as Date,
+  };
+}
+
+function toModelConfiguration(row: QueryResultRow): DbModelConfiguration {
+  return {
+    org_id: String(row.org_id),
+    deployment_mode: row.deployment_mode as DbModelConfiguration['deployment_mode'],
+    endpoint_url: String(row.endpoint_url),
+    model_name: String(row.model_name),
+    credential_ciphertext: row.credential_ciphertext ? (row.credential_ciphertext as Buffer) : null,
+    credential_key_version:
+      row.credential_key_version === null || row.credential_key_version === undefined
+        ? null
+        : Number(row.credential_key_version),
+    credential_updated_at: row.credential_updated_at ? (row.credential_updated_at as Date) : null,
+    timeout_ms: Number(row.timeout_ms),
+    ca_bundle: row.ca_bundle ? (row.ca_bundle as Buffer) : null,
+    updated_at: row.updated_at as Date,
   };
 }
 
@@ -1072,6 +1103,68 @@ function createDal(ctx: TransactionContext) {
         );
       },
     },
+    modelConfigurations: {
+      async findByOrgId(orgId: string): Promise<DbModelConfiguration | undefined> {
+        const row = await one<QueryResultRow>(
+          ctx,
+          'SELECT * FROM model_configurations WHERE org_id = $1',
+          [orgId],
+        );
+        return row ? toModelConfiguration(row) : undefined;
+      },
+      async upsert(input: {
+        orgId: string;
+        deploymentMode: 'saas' | 'onprem';
+        endpointUrl: string;
+        modelName: string;
+        timeoutMs: number;
+        credentialCiphertext?: Buffer;
+        credentialKeyVersion?: number;
+        caBundle?: Buffer | null;
+      }): Promise<DbModelConfiguration> {
+        const credentialProvided = input.credentialCiphertext !== undefined;
+        const row = await one<QueryResultRow>(
+          ctx,
+          `INSERT INTO model_configurations (
+             org_id, deployment_mode, endpoint_url, model_name,
+             credential_ciphertext, credential_key_version, credential_updated_at,
+             timeout_ms, ca_bundle
+           ) VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5::bytea IS NULL THEN NULL ELSE now() END, $7, $8)
+           ON CONFLICT (org_id) DO UPDATE SET
+             deployment_mode = EXCLUDED.deployment_mode,
+             endpoint_url = EXCLUDED.endpoint_url,
+             model_name = EXCLUDED.model_name,
+             timeout_ms = EXCLUDED.timeout_ms,
+             ca_bundle = COALESCE(EXCLUDED.ca_bundle, model_configurations.ca_bundle),
+             credential_ciphertext = CASE
+               WHEN $9::boolean THEN EXCLUDED.credential_ciphertext
+               ELSE model_configurations.credential_ciphertext
+             END,
+             credential_key_version = CASE
+               WHEN $9::boolean THEN EXCLUDED.credential_key_version
+               ELSE model_configurations.credential_key_version
+             END,
+             credential_updated_at = CASE
+               WHEN $9::boolean THEN now()
+               ELSE model_configurations.credential_updated_at
+             END,
+             updated_at = now()
+           RETURNING *`,
+          [
+            input.orgId,
+            input.deploymentMode,
+            input.endpointUrl,
+            input.modelName,
+            input.credentialCiphertext ?? null,
+            input.credentialKeyVersion ?? null,
+            input.timeoutMs,
+            input.caBundle === undefined ? null : input.caBundle,
+            credentialProvided,
+          ],
+        );
+        return toModelConfiguration(row!);
+      },
+    },
   };
 }
 
@@ -1088,6 +1181,7 @@ export function createOrgDal(ctx: OrgTransactionContext | SystemTransactionConte
     purchases: dal.purchases,
     idempotencyKeys: dal.idempotencyKeys,
     webhookEvents: dal.webhookEvents,
+    modelConfigurations: dal.modelConfigurations,
   };
 }
 

@@ -15,6 +15,7 @@ import { buildCreditsRouter } from './routes/credits.js';
 import { buildPurchasesRouter } from './routes/purchases.js';
 import { buildInferenceRouter } from './routes/inference.js';
 import { buildBillingRouter } from './routes/billing.js';
+import { buildModelConfigRouter } from './routes/modelConfig.js';
 import { attachRawBody } from './middleware/rawBody.js';
 import { buildIdempotencyMiddleware } from './middleware/idempotency.js';
 
@@ -101,8 +102,9 @@ export function buildApp(logger: Logger, pool: DatabasePool, redis: Redis): expr
   app.use(
     '/inference',
     buildIdempotencyMiddleware(pool, logger, getAuth, { required: true }),
-    buildInferenceRouter(pool, getAuth),
+    buildInferenceRouter(pool, redis, logger, getAuth),
   );
+  app.use('/model-config', buildModelConfigRouter(pool, logger, getAuth));
   app.use('/billing', buildBillingRouter(logger, pool));
 
   app.use(createErrorHandler(logger));
