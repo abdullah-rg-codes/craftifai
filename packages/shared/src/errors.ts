@@ -72,3 +72,11 @@ export function idempotencyInProgress(): AppError {
     409,
   );
 }
+
+export function webhookInvalid(message: string): AppError {
+  return new AppError('WEBHOOK_INVALID', message, 400);
+}
+
+export function webhookReplay(message: string): AppError {
+  return new AppError('WEBHOOK_REPLAY', message, 409);
+}

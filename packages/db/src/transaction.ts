@@ -1,4 +1,4 @@
-import type { QueryResultRow } from 'pg';
+import type { QueryResultRow, PoolClient } from 'pg';
 import type { DatabasePool } from './pool.js';
 
 interface BaseTransactionContext {
@@ -72,5 +72,30 @@ export async function withSystemTransaction<T>(
     throw error;
   } finally {
     client.release();
+  }
+}
+
+export async function withSystemTransactionOnClient<T>(
+  client: PoolClient,
+  fn: (ctx: SystemTransactionContext) => Promise<T>,
+): Promise<T> {
+  await client.query('BEGIN');
+  await client.query("SELECT set_config('app.current_org', '', true)");
+  await client.query("SELECT set_config('app.is_system', 'true', true)");
+  const ctx: SystemTransactionContext = {
+    query: async <T extends QueryResultRow = QueryResultRow>(sql: string, params?: unknown[]) => {
+      const result = await client.query<T>(sql, params);
+      return { rows: result.rows, rowCount: result.rowCount ?? 0 };
+    },
+    scope: 'system',
+    orgId: undefined,
+  };
+  try {
+    const result = await fn(ctx);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
   }
 }
