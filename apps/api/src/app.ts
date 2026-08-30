@@ -11,6 +11,12 @@ import { buildAuthRouter } from './routes/auth.js';
 import { buildOrgsRouter } from './routes/orgs.js';
 import { buildMembersRouter } from './routes/members.js';
 import { buildAuditRouter } from './routes/audit.js';
+import { buildCreditsRouter } from './routes/credits.js';
+import { buildPurchasesRouter } from './routes/purchases.js';
+import { buildInferenceRouter } from './routes/inference.js';
+import { buildBillingRouter } from './routes/billing.js';
+import { attachRawBody } from './middleware/rawBody.js';
+import { buildIdempotencyMiddleware } from './middleware/idempotency.js';
 
 function asyncMiddleware(
   fn: (req: Request, res: Response, next: NextFunction) => Promise<void>,
@@ -23,7 +29,7 @@ function asyncMiddleware(
 export function buildApp(logger: Logger, pool: DatabasePool, redis: Redis): express.Application {
   const app = express();
 
-  app.use(express.json());
+  app.use(express.json({ verify: attachRawBody }));
   app.use(cookieParser(sessionSecret()));
 
   app.use((req, res, next) => {
@@ -86,6 +92,18 @@ export function buildApp(logger: Logger, pool: DatabasePool, redis: Redis): expr
   app.use('/orgs', buildOrgsRouter(logger, pool, redis, getAuth));
   app.use('/members', buildMembersRouter(logger, pool, redis, getAuth));
   app.use('/audit-events', buildAuditRouter(pool, getAuth));
+  app.use('/credits', buildCreditsRouter(pool, getAuth));
+  app.use(
+    '/purchases',
+    buildIdempotencyMiddleware(pool, logger, getAuth, { required: true }),
+    buildPurchasesRouter(pool, getAuth),
+  );
+  app.use(
+    '/inference',
+    buildIdempotencyMiddleware(pool, logger, getAuth, { required: true }),
+    buildInferenceRouter(pool, getAuth),
+  );
+  app.use('/billing', buildBillingRouter(logger, pool));
 
   app.use(createErrorHandler(logger));
 
