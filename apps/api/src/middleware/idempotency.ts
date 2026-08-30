@@ -66,7 +66,7 @@ export function buildIdempotencyMiddleware(
     }
 
     const fingerprint = createHash('sha256').update(rawBody).digest();
-    const endpoint = req.path;
+    const endpoint = (req.originalUrl ?? req.path).split('?')[0] ?? req.path;
     const orgId = auth.orgId;
     const ttlSeconds = options.ttlSeconds ?? DEFAULT_IDEMPOTENCY_TTL_SECONDS;
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000);

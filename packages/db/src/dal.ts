@@ -624,7 +624,7 @@ function createDal(ctx: TransactionContext) {
         limit: number,
       ): Promise<DbCreditLedgerWithCursor[]> {
         if (cursor) {
-          return many<DbCreditLedgerWithCursor>(
+          const rows = await many<QueryResultRow>(
             ctx,
             `SELECT *,
                     to_char(
@@ -638,8 +638,9 @@ function createDal(ctx: TransactionContext) {
               LIMIT $4`,
             [orgId, cursor.createdAt, cursor.id, limit + 1],
           );
+          return rows.map(toLedger);
         }
-        return many<DbCreditLedgerWithCursor>(
+        const rows = await many<QueryResultRow>(
           ctx,
           `SELECT *,
                   to_char(
@@ -652,6 +653,7 @@ function createDal(ctx: TransactionContext) {
             LIMIT $2`,
           [orgId, limit + 1],
         );
+        return rows.map(toLedger);
       },
     },
     creditReservations: {
@@ -771,7 +773,7 @@ function createDal(ctx: TransactionContext) {
         limit: number,
       ): Promise<DbCreditReservationWithCursor[]> {
         if (cursor) {
-          return many<DbCreditReservationWithCursor>(
+          const rows = await many<QueryResultRow>(
             ctx,
             `SELECT *,
                     to_char(
@@ -785,8 +787,9 @@ function createDal(ctx: TransactionContext) {
               LIMIT $4`,
             [orgId, cursor.createdAt, cursor.id, limit + 1],
           );
+          return rows.map(toReservation);
         }
-        return many<DbCreditReservationWithCursor>(
+        const rows = await many<QueryResultRow>(
           ctx,
           `SELECT *,
                   to_char(
@@ -799,6 +802,7 @@ function createDal(ctx: TransactionContext) {
             LIMIT $2`,
           [orgId, limit + 1],
         );
+        return rows.map(toReservation);
       },
       async listByUserId(
         userId: string,
@@ -806,7 +810,7 @@ function createDal(ctx: TransactionContext) {
         limit: number,
       ): Promise<DbCreditReservationWithCursor[]> {
         if (cursor) {
-          return many<DbCreditReservationWithCursor>(
+          const rows = await many<QueryResultRow>(
             ctx,
             `SELECT *,
                     to_char(
@@ -820,8 +824,9 @@ function createDal(ctx: TransactionContext) {
               LIMIT $4`,
             [userId, cursor.createdAt, cursor.id, limit + 1],
           );
+          return rows.map(toReservation);
         }
-        return many<DbCreditReservationWithCursor>(
+        const rows = await many<QueryResultRow>(
           ctx,
           `SELECT *,
                   to_char(
@@ -834,6 +839,7 @@ function createDal(ctx: TransactionContext) {
             LIMIT $2`,
           [userId, limit + 1],
         );
+        return rows.map(toReservation);
       },
     },
     purchases: {
@@ -912,7 +918,7 @@ function createDal(ctx: TransactionContext) {
         limit: number,
       ): Promise<DbPurchaseWithCursor[]> {
         if (cursor) {
-          return many<DbPurchaseWithCursor>(
+          const rows = await many<QueryResultRow>(
             ctx,
             `SELECT *,
                     to_char(
@@ -926,8 +932,9 @@ function createDal(ctx: TransactionContext) {
               LIMIT $4`,
             [orgId, cursor.createdAt, cursor.id, limit + 1],
           );
+          return rows.map(toPurchase);
         }
-        return many<DbPurchaseWithCursor>(
+        const rows = await many<QueryResultRow>(
           ctx,
           `SELECT *,
                   to_char(
@@ -940,6 +947,7 @@ function createDal(ctx: TransactionContext) {
             LIMIT $2`,
           [orgId, limit + 1],
         );
+        return rows.map(toPurchase);
       },
     },
     idempotencyKeys: {

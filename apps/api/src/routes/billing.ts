@@ -19,7 +19,11 @@ export function buildBillingRouter(logger: Logger, pool: DatabasePool): Router {
         throw webhookInvalid('Missing X-Webhook-Signature header');
       }
 
-      const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      const rawBody = req.rawBody;
+      if (!rawBody || rawBody.length === 0) {
+        throw webhookInvalid('Raw request body not available for signature verification');
+      }
+      const body = rawBody.toString('utf8');
       let payload: WebhookPayload;
       try {
         payload = verifyWebhook(body, signature, env.webhookSecret());

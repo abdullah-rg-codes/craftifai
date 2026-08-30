@@ -17,7 +17,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "pnpm test:unit && pnpm test:integration",
-    "test:unit": "vitest run --exclude **/foundation.test.ts",
+    "test:unit": "vitest run --exclude **/foundation.test.ts --exclude **/credits.test.ts",
     "test:integration": "node -e \"for (const key of ['DATABASE_URL','DATABASE_ADMIN_URL','REDIS_URL','SESSION_SECRET','WEBHOOK_SECRET']) if (!process.env[key]) throw new Error('Missing integration-test environment variable: ' + key)\" && vitest run apps/api/test/foundation.test.ts apps/api/test/credits.test.ts",
     "test:watch": "vitest",
     "dev": "pnpm --filter api dev & pnpm --filter web dev",

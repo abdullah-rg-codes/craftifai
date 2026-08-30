@@ -7,8 +7,8 @@ export interface ModelResponse {
 }
 
 export async function callStubModel(input: { max_total_tokens: number }): Promise<ModelResponse> {
-  // Deterministic stub: consume between 1 and max_total_tokens, inclusive, with a predictable
-  // fraction that exercises the ceiling boundary without being random.
-  const actual = Math.max(1, Math.ceil(input.max_total_tokens * 0.6));
+  // Stay under one credit-block when the reservation covers more than one, so settle
+  // refunds unused reserved credits without introducing randomness.
+  const actual = input.max_total_tokens > 1000 ? 500 : input.max_total_tokens;
   return { usage: { total_tokens: actual } };
 }

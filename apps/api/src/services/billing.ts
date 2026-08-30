@@ -17,14 +17,22 @@ export interface SignedWebhook {
   body: string;
 }
 
-export function signWebhook(payload: WebhookPayload, secret: string): SignedWebhook {
-  const body = JSON.stringify(payload);
-  const timestamp = Math.floor(Date.now() / 1000);
-  const signedPayload = `${timestamp}.${body}`;
-  const signature = createHmac('sha256', secret).update(signedPayload).digest('hex');
+export function signWebhook(
+  payload: Omit<WebhookPayload, 'timestamp'> & { timestamp?: number },
+  secret: string,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+): SignedWebhook {
+  const signed: WebhookPayload = {
+    purchase_id: payload.purchase_id,
+    provider_event_id: payload.provider_event_id,
+    credits: payload.credits,
+    timestamp: nowSeconds,
+  };
+  const body = JSON.stringify(signed);
+  const signature = createHmac('sha256', secret).update(`${nowSeconds}.${body}`).digest('hex');
   return {
-    payload: { ...payload, timestamp },
-    signature: `t=${timestamp},${WEBHOOK_SIGNATURE_SCHEME}=${signature}`,
+    payload: signed,
+    signature: `t=${nowSeconds},${WEBHOOK_SIGNATURE_SCHEME}=${signature}`,
     body,
   };
 }
@@ -33,6 +41,7 @@ export function verifyWebhook(
   body: string,
   signatureHeader: string,
   secret: string,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
 ): WebhookPayload {
   const parts = signatureHeader.split(',');
   const timestampPart = parts.find((part) => part.startsWith('t='));
@@ -47,22 +56,20 @@ export function verifyWebhook(
     throw webhookInvalid('Invalid timestamp');
   }
 
-  const now = Math.floor(Date.now() / 1000);
-  if (now - timestamp > WEBHOOK_MAX_AGE_SECONDS) {
-    throw webhookReplay('Webhook timestamp too old');
-  }
-
+  const receivedSignature = signaturePart.slice(WEBHOOK_SIGNATURE_SCHEME.length + 1);
   const expectedSignature = createHmac('sha256', secret)
     .update(`${timestamp}.${body}`)
     .digest('hex');
-  const receivedSignature = signaturePart.slice(WEBHOOK_SIGNATURE_SCHEME.length + 1);
 
-  if (receivedSignature.length !== expectedSignature.length) {
+  if (
+    receivedSignature.length !== expectedSignature.length ||
+    !timingSafeEqual(Buffer.from(receivedSignature), Buffer.from(expectedSignature))
+  ) {
     throw webhookInvalid('Invalid signature');
   }
 
-  if (!timingSafeEqual(Buffer.from(receivedSignature), Buffer.from(expectedSignature))) {
-    throw webhookInvalid('Invalid signature');
+  if (nowSeconds - timestamp > WEBHOOK_MAX_AGE_SECONDS) {
+    throw webhookReplay('Webhook timestamp too old');
   }
 
   let payload: unknown;

@@ -22,6 +22,16 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function lockCreditAccount(
+  client: { query: (sql: string, params?: unknown[]) => Promise<unknown> },
+  orgId: string,
+): Promise<void> {
+  await client.query('BEGIN');
+  await client.query("SELECT set_config('app.is_system', 'true', true)");
+  await client.query("SELECT set_config('app.current_org', '', true)");
+  await client.query('SELECT * FROM org_credit_accounts WHERE org_id = $1 FOR UPDATE', [orgId]);
+}
+
 async function countBlockedSessions(
   adminPool: DatabasePool,
   blockerPid: number,
@@ -112,9 +122,10 @@ describeIf('Phase 2 credit core', () => {
     });
 
     const ledger = await app.get('/credits/ledger').set('Cookie', admin.cookie).expect(200);
-    expect(ledger.body.entries).toHaveLength(2);
+    expect(ledger.body.entries).toHaveLength(3);
     expect(ledger.body.entries).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({ kind: 'purchase', delta_available: 10, delta_reserved: 0 }),
         expect.objectContaining({ kind: 'reservation', delta_available: -2, delta_reserved: 2 }),
         expect.objectContaining({ kind: 'settlement', delta_available: 1, delta_reserved: -2 }),
       ]),
@@ -218,7 +229,8 @@ describeIf('Phase 2 credit core', () => {
     const applied = await app
       .post('/billing/webhook')
       .set('X-Webhook-Signature', webhook.signature)
-      .send(webhook.payload)
+      .set('Content-Type', 'application/json')
+      .send(webhook.body)
       .expect(200);
 
     expect(applied.body.applied).toBe(true);
@@ -258,13 +270,15 @@ describeIf('Phase 2 credit core', () => {
     await app
       .post('/billing/webhook')
       .set('X-Webhook-Signature', webhook.signature)
-      .send(webhook.payload)
+      .set('Content-Type', 'application/json')
+      .send(webhook.body)
       .expect(200);
 
     const replay = await app
       .post('/billing/webhook')
       .set('X-Webhook-Signature', webhook.signature)
-      .send(webhook.payload)
+      .set('Content-Type', 'application/json')
+      .send(webhook.body)
       .expect(204);
 
     expect(replay.body.applied).toBe(false);
@@ -286,25 +300,30 @@ describeIf('Phase 2 credit core', () => {
       .expect(201);
 
     const payload = {
-      purchase_id: purchase.body.purchaseId,
+      purchase_id: purchase.body.purchaseId as string,
       provider_event_id: 'evt_bad',
       credits: 50,
-      timestamp: 0,
     };
-    const body = JSON.stringify(payload);
+    const recent = signWebhook(payload, env.webhookSecret());
 
     const badSignature = await app
       .post('/billing/webhook')
-      .set('X-Webhook-Signature', 't=100,v1=deadbeef')
-      .send(body)
+      .set('X-Webhook-Signature', `t=${recent.payload.timestamp},v1=deadbeef`)
+      .set('Content-Type', 'application/json')
+      .send(recent.body)
       .expect(400);
     expect(badSignature.body.error.code).toBe('WEBHOOK_INVALID');
 
-    const stale = signWebhook({ ...payload, provider_event_id: 'evt_stale' }, env.webhookSecret());
+    const stale = signWebhook(
+      { ...payload, provider_event_id: 'evt_stale' },
+      env.webhookSecret(),
+      Math.floor(Date.now() / 1000) - 400,
+    );
     const staleReplay = await app
       .post('/billing/webhook')
       .set('X-Webhook-Signature', stale.signature)
-      .send(stale.payload)
+      .set('Content-Type', 'application/json')
+      .send(stale.body)
       .expect(409);
     expect(staleReplay.body.error.code).toBe('WEBHOOK_REPLAY');
   });
@@ -387,10 +406,7 @@ describeIf('Phase 2 credit core', () => {
     const blocker = await adminPool.connect();
     const requests: Promise<supertest.Response>[] = [];
     try {
-      await blocker.query('BEGIN');
-      await blocker.query('SELECT * FROM org_credit_accounts WHERE org_id = $1 FOR UPDATE', [
-        admin.orgId,
-      ]);
+      await lockCreditAccount(blocker, admin.orgId);
       const backend = await blocker.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
       const blockerPid = backend.rows[0]!.pid;
 
@@ -443,10 +459,7 @@ describeIf('Phase 2 credit core', () => {
     const blocker = await adminPool.connect();
     const requests: Promise<supertest.Response>[] = [];
     try {
-      await blocker.query('BEGIN');
-      await blocker.query('SELECT * FROM org_credit_accounts WHERE org_id = $1 FOR UPDATE', [
-        admin.orgId,
-      ]);
+      await lockCreditAccount(blocker, admin.orgId);
       const backend = await blocker.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
       const blockerPid = backend.rows[0]!.pid;
 
@@ -514,7 +527,8 @@ describeIf('Phase 2 credit core', () => {
         app
           .post('/billing/webhook')
           .set('X-Webhook-Signature', webhook.signature)
-          .send(webhook.payload),
+          .set('Content-Type', 'application/json')
+          .send(webhook.body),
       );
     }
 
@@ -557,10 +571,7 @@ describeIf('Phase 2 credit core', () => {
     const blocker = await testApp1.adminPool.connect();
     const requests: Promise<supertest.Response>[] = [];
     try {
-      await blocker.query('BEGIN');
-      await blocker.query('SELECT * FROM org_credit_accounts WHERE org_id = $1 FOR UPDATE', [
-        admin1.orgId,
-      ]);
+      await lockCreditAccount(blocker, admin1.orgId);
       const backend = await blocker.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
       const blockerPid = backend.rows[0]!.pid;
 
