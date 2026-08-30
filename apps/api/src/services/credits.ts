@@ -174,11 +174,24 @@ export function createCreditService(dal: OrgDal) {
       };
     },
 
-    async createPurchase(input: { orgId: string; credits: number }): Promise<PurchaseResult> {
+    async createPurchase(input: {
+      orgId: string;
+      credits: number;
+      initiatedByUserId: string;
+    }): Promise<PurchaseResult> {
       await dal.creditAccounts.getOrCreate(input.orgId);
       const purchase = await dal.purchases.create({
         orgId: input.orgId,
         credits: input.credits,
+        initiatedByUserId: input.initiatedByUserId,
+      });
+      await dal.audit.create({
+        orgId: input.orgId,
+        actorUserId: input.initiatedByUserId,
+        action: 'purchase.create',
+        targetType: 'purchase',
+        targetId: purchase.id,
+        metadata: { credits: purchase.credits, status: purchase.status },
       });
       return {
         purchaseId: purchase.id,
@@ -215,6 +228,19 @@ export function createCreditService(dal: OrgDal) {
         deltaReserved: 0,
         purchaseId: purchase.id,
       });
+      if (purchase.initiated_by_user_id) {
+        await dal.audit.create({
+          orgId: purchase.org_id,
+          actorUserId: purchase.initiated_by_user_id,
+          action: 'purchase.complete',
+          targetType: 'purchase',
+          targetId: purchase.id,
+          metadata: {
+            credits: purchase.credits,
+            provider_event_id: input.providerEventId,
+          },
+        });
+      }
       await dal.webhookEvents.markProcessed(input.providerEventId);
       return { applied: true, purchaseId: purchase.id };
     },

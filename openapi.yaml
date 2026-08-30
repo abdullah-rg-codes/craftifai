@@ -1,0 +1,497 @@
+openapi: 3.1.0
+info:
+  title: CraftifAI Control Plane API
+  version: 0.1.0
+  description: |
+    Multi-tenant AI control plane. All authenticated routes require a session cookie
+    (`craftifai_session`). Multi-org users may send `X-Org-Id` to select context.
+    Cross-tenant access returns 404 (not 403).
+
+servers:
+  - url: http://localhost/api
+    description: Docker Compose (nginx proxy)
+  - url: http://localhost:3000
+    description: Local API dev server
+
+tags:
+  - name: system
+  - name: auth
+  - name: orgs
+  - name: members
+  - name: credits
+  - name: purchases
+  - name: billing
+  - name: inference
+  - name: model
+  - name: audit
+
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Liveness
+      responses:
+        '200':
+          description: Process is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  replica: { type: string }
+
+  /ready:
+    get:
+      tags: [system]
+      summary: Readiness (PostgreSQL + Redis only)
+      responses:
+        '200':
+          description: Ready
+        '503':
+          description: Not ready
+
+  /metrics:
+    get:
+      tags: [system]
+      summary: Prometheus metrics
+      responses:
+        '200':
+          description: text/plain metrics
+
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Register user and new organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                display_name: { type: string }
+      responses:
+        '201':
+          description: Created; session cookie set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id: { type: string, format: uuid }
+                  org_id: { type: string, format: uuid }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: OK; session cookie set
+        '401':
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      security: [{ cookieAuth: [] }]
+      responses:
+        '204':
+          description: Session revoked
+
+  /auth/me:
+    get:
+      tags: [auth]
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+
+  /orgs:
+    get:
+      tags: [orgs]
+      security: [{ cookieAuth: [] }]
+      summary: Active organization details
+      responses:
+        '200':
+          description: Organization
+        '404':
+          description: Not found
+
+  /members:
+    get:
+      tags: [members]
+      security: [{ cookieAuth: [] }]
+      summary: List members (admin, cursor-paginated)
+      parameters:
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Member page
+        '403':
+          description: Administrator required
+
+  /members/invitations:
+    post:
+      tags: [members]
+      security: [{ cookieAuth: [] }]
+      summary: Create invitation (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { type: string, enum: [administrator, member] }
+      responses:
+        '201':
+          description: Invitation created; one-time token in body
+
+  /members/invitations/accept:
+    post:
+      tags: [members]
+      security: [{ cookieAuth: [] }]
+      summary: Accept invitation by token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, minLength: 32 }
+      responses:
+        '201':
+          description: Membership created
+
+  /members/{membershipId}/role:
+    patch:
+      tags: [members]
+      security: [{ cookieAuth: [] }]
+      summary: Promote or demote (admin)
+      parameters:
+        - name: membershipId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [administrator, member] }
+      responses:
+        '204':
+          description: Updated
+        '403':
+          description: Last administrator or forbidden
+
+  /members/{membershipId}/status:
+    patch:
+      tags: [members]
+      security: [{ cookieAuth: [] }]
+      summary: Suspend or reactivate (admin)
+      parameters:
+        - name: membershipId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, suspended] }
+      responses:
+        '204':
+          description: Updated
+
+  /members/{membershipId}:
+    delete:
+      tags: [members]
+      security: [{ cookieAuth: [] }]
+      summary: Remove member (admin)
+      parameters:
+        - name: membershipId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Removed
+
+  /credits/account:
+    get:
+      tags: [credits]
+      security: [{ cookieAuth: [] }]
+      summary: Credit balance (admin)
+      responses:
+        '200':
+          description: Available and reserved credits
+
+  /credits/ledger:
+    get:
+      tags: [credits]
+      security: [{ cookieAuth: [] }]
+      summary: Ledger history (admin, paginated)
+      parameters:
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Ledger entries
+
+  /credits/reservations:
+    get:
+      tags: [credits]
+      security: [{ cookieAuth: [] }]
+      summary: Org usage / reservations (admin, paginated)
+      parameters:
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Reservations
+
+  /credits/reservations/me:
+    get:
+      tags: [credits]
+      security: [{ cookieAuth: [] }]
+      summary: Personal usage (member, paginated)
+      parameters:
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Reservations
+
+  /purchases:
+    get:
+      tags: [purchases]
+      security: [{ cookieAuth: [] }]
+      summary: List purchases (admin, paginated)
+      parameters:
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Purchases
+    post:
+      tags: [purchases]
+      security: [{ cookieAuth: [] }]
+      summary: Start credit purchase (admin)
+      parameters:
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [credits]
+              properties:
+                credits: { type: integer, minimum: 1, maximum: 1000000 }
+      responses:
+        '201':
+          description: Pending purchase created
+
+  /purchases/{purchaseId}/confirm-mock:
+    post:
+      tags: [purchases]
+      security: [{ cookieAuth: [] }]
+      summary: Demo helper — apply credits without webhook signature
+      description: Development/demo only. Production path is POST /billing/webhook.
+      parameters:
+        - name: purchaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/idempotencyKey'
+      responses:
+        '200':
+          description: Applied or already completed
+
+  /billing/webhook:
+    post:
+      tags: [billing]
+      summary: Signed billing webhook (mock provider)
+      parameters:
+        - name: X-Webhook-Signature
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookPayload'
+      responses:
+        '200':
+          description: Processed or duplicate
+
+  /inference:
+    post:
+      tags: [inference]
+      security: [{ cookieAuth: [] }]
+      summary: Run inference (reserve → model → settle)
+      parameters:
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [max_total_tokens]
+              properties:
+                max_total_tokens: { type: integer, minimum: 1, maximum: 1000000 }
+                messages:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role: { type: string, enum: [system, user, assistant] }
+                      content: { type: string }
+      responses:
+        '200':
+          description: Success; may include Idempotency-Replayed on replay
+        '402':
+          description: Insufficient credits
+        '409':
+          description: Idempotency conflict or in progress
+        '502':
+          description: Model failure (reservation released)
+
+  /model-config:
+    get:
+      tags: [model]
+      security: [{ cookieAuth: [] }]
+      summary: Get model config (admin, no credential)
+      responses:
+        '200':
+          description: Public config view
+    put:
+      tags: [model]
+      security: [{ cookieAuth: [] }]
+      summary: Upsert model config (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint_url, model_name]
+              properties:
+                deployment_mode: { type: string, enum: [saas, onprem] }
+                endpoint_url: { type: string, format: uri }
+                model_name: { type: string }
+                timeout_ms: { type: integer, minimum: 1000, maximum: 120000 }
+                credential: { type: string, description: Write-only; omitted to keep existing }
+                ca_bundle: { type: string, description: PEM text }
+      responses:
+        '200':
+          description: Saved
+
+  /model-config/test:
+    post:
+      tags: [model]
+      security: [{ cookieAuth: [] }]
+      summary: Connectivity test (admin, no charge)
+      responses:
+        '200':
+          description: Reachable or structured failure
+
+  /audit-events:
+    get:
+      tags: [audit]
+      security: [{ cookieAuth: [] }]
+      summary: Audit log (admin, paginated)
+      parameters:
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Audit events
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: craftifai_session
+
+  parameters:
+    cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+      description: Opaque base64url composite cursor
+    limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    idempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string }
+
+  schemas:
+    Session:
+      type: object
+      properties:
+        user_id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        org_id: { type: string, format: uuid }
+        role: { type: string, enum: [administrator, member] }
+
+    WebhookPayload:
+      type: object
+      required: [purchase_id, provider_event_id, credits, timestamp]
+      properties:
+        purchase_id: { type: string, format: uuid }
+        provider_event_id: { type: string }
+        credits: { type: integer }
+        timestamp: { type: integer, description: Unix seconds }
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: object }

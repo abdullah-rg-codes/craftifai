@@ -115,6 +115,7 @@ export interface DbPurchase {
   credits: number;
   status: 'pending' | 'completed' | 'failed';
   provider_event_id: string | null;
+  initiated_by_user_id: string | null;
   created_at: Date;
   completed_at: Date | null;
 }
@@ -210,6 +211,10 @@ function toPurchase(row: QueryResultRow): DbPurchaseWithCursor {
     credits: parseCredits(row.credits),
     status: row.status as DbPurchase['status'],
     provider_event_id: row.provider_event_id ? String(row.provider_event_id) : null,
+    initiated_by_user_id:
+      row.initiated_by_user_id === null || row.initiated_by_user_id === undefined
+        ? null
+        : String(row.initiated_by_user_id),
     created_at: row.created_at as Date,
     completed_at: row.completed_at ? (row.completed_at as Date) : null,
     cursor_created_at: String(row.cursor_created_at),
@@ -890,16 +895,23 @@ function createDal(ctx: TransactionContext) {
       async create(input: {
         orgId: string;
         credits: number;
+        initiatedByUserId: string;
         providerEventId?: string;
       }): Promise<DbPurchaseWithCursor> {
         return toPurchase(
           (await one<QueryResultRow>(
             ctx,
-            `INSERT INTO purchases (org_id, credits, status, provider_event_id)
-             VALUES ($1, $2, $3, $4)
+            `INSERT INTO purchases (org_id, credits, status, provider_event_id, initiated_by_user_id)
+             VALUES ($1, $2, $3, $4, $5)
              RETURNING *,
                       to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at`,
-            [input.orgId, input.credits, 'pending', input.providerEventId ?? null],
+            [
+              input.orgId,
+              input.credits,
+              'pending',
+              input.providerEventId ?? null,
+              input.initiatedByUserId,
+            ],
           ))!,
         );
       },

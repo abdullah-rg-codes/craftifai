@@ -56,7 +56,11 @@ export function buildPurchasesRouter(
       const purchase = await withTransaction(pool, auth.orgId, async (ctx) => {
         const dal = createOrgDal(ctx);
         const service = createCreditService(dal);
-        const result = await service.createPurchase({ orgId: auth.orgId, credits: body.credits });
+        const result = await service.createPurchase({
+          orgId: auth.orgId,
+          credits: body.credits,
+          initiatedByUserId: auth.userId,
+        });
         if (idempotencyKey) {
           await dal.idempotencyKeys.markCompleted({
             ...idempotencyKey,

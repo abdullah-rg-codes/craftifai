@@ -329,6 +329,11 @@ describeIf('Phase 2 credit core', () => {
       delta_available: 50,
       delta_reserved: 0,
     });
+
+    const audit = await app.get('/audit-events').set('Cookie', admin.cookie).expect(200);
+    expect(audit.body.events.map((event: { action: string }) => event.action)).toEqual(
+      expect.arrayContaining(['purchase.create', 'purchase.complete']),
+    );
   });
 
   it('confirms a pending purchase through mock billing without exposing a signature', async () => {
