@@ -16,16 +16,16 @@ The 150 ms control-plane target from the brief is **not** the number this harnes
 
 Filled from the `compose-load` job JSON summary:
 
-| Metric                                     | Value |
-| ------------------------------------------ | ----- |
-| Duration                                   | 28.673 s |
-| Requests                                   | 4868 |
-| Request rate                               | 169.8 /s |
-| p50 / p95 / p99 (ms)                       | 910 / 3128 / 4017 |
+| Metric                                     | Value                                                                                                                   |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Duration                                   | 28.673 s                                                                                                                |
+| Requests                                   | 4868                                                                                                                    |
+| Request rate                               | 169.8 /s                                                                                                                |
+| p50 / p95 / p99 (ms)                       | 910 / 3128 / 4017                                                                                                       |
 | Error mix                                  | 402: 560 (11.5%); model 502: 451 (9.3%); 429: 3191 (65.5%); timeout: 53 (1.1%); 5xx: 0; other: 0; HTTP 200: 613 (12.6%) |
-| Peak `pg_stat_database.numbackends`        | 41 |
-| Peak `pg_stat_activity`                    | 41 |
-| Peak Postgres CPU (`docker compose stats`) | 57.2% |
+| Peak `pg_stat_database.numbackends`        | 41                                                                                                                      |
+| Peak `pg_stat_activity`                    | 41                                                                                                                      |
+| Peak Postgres CPU (`docker compose stats`) | 57.2%                                                                                                                   |
 
 Latency is **end-to-end worker time** (nginx → replica → mock). It is not control-plane-only.
 
