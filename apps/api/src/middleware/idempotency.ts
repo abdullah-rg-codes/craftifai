@@ -41,6 +41,11 @@ export function buildIdempotencyMiddleware(
   options: { required?: boolean; ttlSeconds?: number } = {},
 ): (req: Request, res: Response, next: NextFunction) => void {
   return asyncMiddleware(async (req, res, next) => {
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      next();
+      return;
+    }
+
     const headerValue = req.headers['idempotency-key'];
     if (headerValue === undefined || Array.isArray(headerValue)) {
       if (options.required) {

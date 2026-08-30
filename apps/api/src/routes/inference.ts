@@ -2,7 +2,14 @@ import { Router, type Request } from 'express';
 import { z } from 'zod';
 import type { Redis } from 'ioredis';
 import { createOrgDal, withTransaction, type DatabasePool } from '@craftifai/db';
-import { modelMalformed, modelTimeout, modelUnavailable, notFound } from '@craftifai/shared';
+import {
+  calculateCreditsFromTokens,
+  insufficientCredits,
+  modelMalformed,
+  modelTimeout,
+  modelUnavailable,
+  notFound,
+} from '@craftifai/shared';
 import type { Logger } from '../logger.js';
 import type { AuthContext } from '../auth.js';
 import { requireAuth } from '../auth.js';
@@ -74,22 +81,29 @@ export function buildInferenceRouter(
         });
 
         if (!reserveResult) {
+          const account = await withTransaction(pool, auth.orgId, async (ctx) => {
+            return createOrgDal(ctx).creditAccounts.getOrCreate(auth.orgId);
+          });
+          const needed = calculateCreditsFromTokens(body.max_total_tokens);
+          const error = insufficientCredits(BigInt(needed), BigInt(account.available));
+          const errorBody = {
+            error: {
+              code: error.code,
+              message: error.message,
+              details: error.details,
+            },
+          };
           if (idempotencyKey) {
             await withTransaction(pool, auth.orgId, async (ctx) => {
               const dal = createOrgDal(ctx);
               await dal.idempotencyKeys.markCompleted({
                 ...idempotencyKey,
                 responseStatus: 402,
-                responseBody: {
-                  error: { code: 'INSUFFICIENT_CREDITS', message: 'Insufficient credits' },
-                },
+                responseBody: errorBody,
               });
             }).catch(() => undefined);
           }
-          res.status(402).json({
-            error: { code: 'INSUFFICIENT_CREDITS', message: 'Insufficient credits' },
-          });
-          return;
+          throw error;
         }
 
         reservationId = reserveResult.reservationId;
@@ -139,11 +153,17 @@ export function buildInferenceRouter(
                     settled_credits: settled.settledCredits,
                     refunded_credits: settled.refundedCredits,
                     usage: modelResponse.usage,
+                    ...(modelResponse.completion !== undefined
+                      ? { completion: modelResponse.completion }
+                      : {}),
                   }
                 : {
                     reservation_id: reservationId,
                     usage: modelResponse.usage,
                     note: 'reservation already terminal',
+                    ...(modelResponse.completion !== undefined
+                      ? { completion: modelResponse.completion }
+                      : {}),
                   },
             };
             if (reservationId) {
@@ -159,6 +179,9 @@ export function buildInferenceRouter(
             reservation_id: reservationId,
             usage: modelResponse.usage,
             note: 'reservation already terminal',
+            ...(modelResponse.completion !== undefined
+              ? { completion: modelResponse.completion }
+              : {}),
           });
           return;
         }
@@ -169,6 +192,9 @@ export function buildInferenceRouter(
           settled_credits: settleResult.settledCredits,
           refunded_credits: settleResult.refundedCredits,
           usage: modelResponse.usage,
+          ...(modelResponse.completion !== undefined
+            ? { completion: modelResponse.completion }
+            : {}),
         });
       } catch (error) {
         if (reservationId) {

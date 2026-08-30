@@ -19,6 +19,7 @@ export interface ModelUsage {
 
 export interface ModelChatResponse {
   usage: ModelUsage;
+  completion?: string;
 }
 
 export type ModelCallFailure =
@@ -106,6 +107,7 @@ export function parseModelResponse(body: Buffer): ModelChatResponse {
       message: 'Model response usage.total_tokens is invalid',
     });
   }
+  const text = extractCompletion(parsed as object);
   return {
     usage: {
       total_tokens: total,
@@ -113,7 +115,23 @@ export function parseModelResponse(body: Buffer): ModelChatResponse {
       completion_tokens:
         typeof completion === 'number' && Number.isInteger(completion) ? completion : 0,
     },
+    ...(text !== undefined ? { completion: text } : {}),
   };
+}
+
+function extractCompletion(parsed: object): string | undefined {
+  if (!('choices' in parsed) || !Array.isArray(parsed.choices) || parsed.choices.length === 0) {
+    return undefined;
+  }
+  const first = parsed.choices[0];
+  if (typeof first !== 'object' || first === null || !('message' in first)) {
+    return undefined;
+  }
+  const message = first.message;
+  if (typeof message !== 'object' || message === null || !('content' in message)) {
+    return undefined;
+  }
+  return typeof message.content === 'string' ? message.content : undefined;
 }
 
 async function requestPinned(

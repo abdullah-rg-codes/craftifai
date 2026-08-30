@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { createOrgDal, withTransaction, type DatabasePool } from '@craftifai/db';
@@ -66,6 +67,38 @@ export function buildPurchasesRouter(
         return result;
       });
       res.status(201).json(purchase);
+    }),
+  );
+
+  router.post(
+    '/:purchaseId/confirm-mock',
+    asyncHandler(async (req, res) => {
+      const auth = getAuth(req);
+      if (!auth) {
+        throw notFound('Organization not found');
+      }
+      requireAdmin(auth);
+      const { purchaseId } = z.object({ purchaseId: z.string().uuid() }).parse(req.params);
+      const result = await withTransaction(pool, auth.orgId, async (ctx) => {
+        const dal = createOrgDal(ctx);
+        const purchase = await dal.purchases.findById(purchaseId);
+        if (!purchase) {
+          throw notFound('Purchase not found');
+        }
+        if (purchase.status !== 'pending') {
+          return { applied: false, purchase_id: purchase.id };
+        }
+        const providerEventId = `mock:${purchase.id}`;
+        const payloadHash = createHash('sha256').update(providerEventId).digest();
+        const service = createCreditService(dal);
+        const applied = await service.applyPurchase({
+          purchaseId: purchase.id,
+          providerEventId,
+          payloadHash,
+        });
+        return { applied: applied.applied, purchase_id: applied.purchaseId };
+      });
+      res.status(200).json(result);
     }),
   );
 

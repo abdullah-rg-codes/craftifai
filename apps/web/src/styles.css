@@ -1,0 +1,179 @@
+:root {
+  color: #1a1a1a;
+  background: #f4f4f2;
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #1a4d7a;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background: #fff;
+  border-bottom: 1px solid #d6d6d2;
+}
+
+.brand {
+  font-weight: 700;
+  text-decoration: none;
+  color: inherit;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+nav a {
+  text-decoration: none;
+}
+
+nav a.active {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.session {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.content,
+.auth-card {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+.auth-card {
+  background: #fff;
+  border: 1px solid #d6d6d2;
+  margin-top: 3rem;
+}
+
+form {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+input,
+select,
+textarea,
+button {
+  padding: 0.4rem 0.55rem;
+}
+
+.row-form {
+  grid-template-columns: 1fr auto auto;
+  align-items: end;
+}
+
+.facts {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.facts div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+dt {
+  color: #555;
+}
+
+dd {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid #e4e4e0;
+  vertical-align: top;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.state,
+.error,
+.notice,
+.completion {
+  padding: 0.75rem 0;
+}
+
+.error {
+  color: #8a1f1f;
+}
+
+.notice {
+  background: #eef5ee;
+  border: 1px solid #c5d6c5;
+  padding: 0.75rem;
+}
+
+.completion {
+  white-space: pre-wrap;
+  background: #fff;
+  border: 1px solid #d6d6d2;
+  padding: 0.75rem;
+}
+
+.muted {
+  color: #555;
+}
+
+code {
+  word-break: break-all;
+}

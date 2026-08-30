@@ -836,6 +836,7 @@ function createDal(ctx: TransactionContext) {
         return rows.map(toReservation);
       },
       async listByUserId(
+        orgId: string,
         userId: string,
         cursor: { createdAt: string; id: string } | null,
         limit: number,
@@ -849,11 +850,12 @@ function createDal(ctx: TransactionContext) {
                       'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
                     ) AS cursor_created_at
                FROM credit_reservations
-              WHERE user_id = $1
-                AND (created_at, id) < ($2::timestamptz, $3)
+              WHERE org_id = $1
+                AND user_id = $2
+                AND (created_at, id) < ($3::timestamptz, $4)
               ORDER BY created_at DESC, id DESC
-              LIMIT $4`,
-            [userId, cursor.createdAt, cursor.id, limit + 1],
+              LIMIT $5`,
+            [orgId, userId, cursor.createdAt, cursor.id, limit + 1],
           );
           return rows.map(toReservation);
         }
@@ -865,10 +867,11 @@ function createDal(ctx: TransactionContext) {
                     'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
                   ) AS cursor_created_at
              FROM credit_reservations
-            WHERE user_id = $1
+            WHERE org_id = $1
+              AND user_id = $2
             ORDER BY created_at DESC, id DESC
-            LIMIT $2`,
-          [userId, limit + 1],
+            LIMIT $3`,
+          [orgId, userId, limit + 1],
         );
         return rows.map(toReservation);
       },

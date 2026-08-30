@@ -11,6 +11,19 @@ describe('model response validation', () => {
       ),
     );
     expect(parsed.usage.total_tokens).toBe(8);
+    expect(parsed.completion).toBeUndefined();
+  });
+
+  it('forwards assistant text when the model returns OpenAI-shaped choices', () => {
+    const parsed = parseModelResponse(
+      Buffer.from(
+        JSON.stringify({
+          choices: [{ message: { role: 'assistant', content: 'ok' } }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      ),
+    );
+    expect(parsed.completion).toBe('ok');
   });
 
   it('treats missing usage as malformed so settlement never sees NaN', () => {

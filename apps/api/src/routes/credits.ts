@@ -90,6 +90,39 @@ export function buildCreditsRouter(
   );
 
   router.get(
+    '/reservations/me',
+    asyncHandler(async (req, res) => {
+      const auth = getAuth(req);
+      if (!auth) {
+        throw notFound('Organization not found');
+      }
+      const query = listQuerySchema.parse(req.query);
+      const cursor = query.cursor ? decodeCursor(query.cursor) : null;
+      const rows = await withTransaction(pool, auth.orgId, async (ctx) => {
+        const dal = createOrgDal(ctx);
+        return dal.creditReservations.listByUserId(auth.orgId, auth.userId, cursor, query.limit);
+      });
+      const hasMore = rows.length > query.limit;
+      const reservations = hasMore ? rows.slice(0, query.limit) : rows;
+      const last = reservations.at(-1);
+      res.json({
+        reservations: reservations.map((r) => ({
+          id: r.id,
+          user_id: r.user_id,
+          status: r.status,
+          reserved_credits: r.reserved_credits,
+          max_total_tokens: r.max_total_tokens,
+          actual_total_tokens: r.actual_total_tokens,
+          settled_credits: r.settled_credits,
+          expires_at: r.expires_at,
+          created_at: r.created_at,
+        })),
+        next_cursor: hasMore && last ? encodeCursor(last.cursor_created_at, last.id) : null,
+      });
+    }),
+  );
+
+  router.get(
     '/reservations',
     asyncHandler(async (req, res) => {
       const auth = getAuth(req);

@@ -219,6 +219,7 @@ describeIf('Phase 2 credit core', () => {
       .expect(402);
 
     expect(response.body.error.code).toBe('INSUFFICIENT_CREDITS');
+    expect(response.body.error.details).toMatchObject({ needed: '2', available: '1' });
 
     const reservations = await app
       .get('/credits/reservations')
@@ -322,6 +323,54 @@ describeIf('Phase 2 credit core', () => {
       delta_available: 50,
       delta_reserved: 0,
     });
+  });
+
+  it('confirms a pending purchase through mock billing without exposing a signature', async () => {
+    const admin = await registerAndLogin(app, 'mock-confirm-admin@example.com');
+    const purchase = await app
+      .post('/purchases')
+      .set('Cookie', admin.cookie)
+      .set('Idempotency-Key', 'mock-confirm')
+      .send({ credits: 25 })
+      .expect(201);
+
+    const confirmed = await app
+      .post(`/purchases/${purchase.body.purchaseId as string}/confirm-mock`)
+      .set('Cookie', admin.cookie)
+      .set('Idempotency-Key', 'mock-confirm-apply')
+      .send({})
+      .expect(200);
+
+    expect(confirmed.body).toEqual({ applied: true, purchase_id: purchase.body.purchaseId });
+    expect(JSON.stringify(confirmed.body)).not.toMatch(/signature|webhook/i);
+
+    const replay = await app
+      .post(`/purchases/${purchase.body.purchaseId as string}/confirm-mock`)
+      .set('Cookie', admin.cookie)
+      .set('Idempotency-Key', 'mock-confirm-replay')
+      .send({})
+      .expect(200);
+    expect(replay.body.applied).toBe(false);
+
+    const account = await app.get('/credits/account').set('Cookie', admin.cookie).expect(200);
+    expect(account.body.available).toBe(25);
+  });
+
+  it('lists personal reservations for the authenticated user', async () => {
+    const admin = await registerAndLogin(app, 'my-usage-admin@example.com');
+    await seedCredits(adminPool, admin.orgId, 10);
+    await enableModel(admin.orgId);
+    await app
+      .post('/inference')
+      .set('Cookie', admin.cookie)
+      .set('Idempotency-Key', 'my-usage')
+      .send({ max_total_tokens: 1000 })
+      .expect(200);
+
+    const mine = await app.get('/credits/reservations/me').set('Cookie', admin.cookie).expect(200);
+    expect(mine.body.reservations).toHaveLength(1);
+    expect(mine.body.reservations[0]?.user_id).toBe(admin.userId);
+    expect(mine.body.next_cursor).toBeNull();
   });
 
   it('does not credit the balance for a replayed webhook event', async () => {
