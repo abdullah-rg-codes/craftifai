@@ -22,6 +22,10 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function fire(request: supertest.Test): Promise<supertest.Response> {
+  return Promise.resolve(request);
+}
+
 async function lockCreditAccount(
   client: { query: (sql: string, params?: unknown[]) => Promise<unknown> },
   orgId: string,
@@ -279,7 +283,7 @@ describeIf('Phase 2 credit core', () => {
       .set('X-Webhook-Signature', webhook.signature)
       .set('Content-Type', 'application/json')
       .send(webhook.body)
-      .expect(204);
+      .expect(200);
 
     expect(replay.body.applied).toBe(false);
 
@@ -412,11 +416,13 @@ describeIf('Phase 2 credit core', () => {
 
       for (let i = 0; i < n; i++) {
         requests.push(
-          app
-            .post('/inference')
-            .set('Cookie', admin.cookie)
-            .set('Idempotency-Key', `concurrent-${i}`)
-            .send({ max_total_tokens: maxTokens }),
+          fire(
+            app
+              .post('/inference')
+              .set('Cookie', admin.cookie)
+              .set('Idempotency-Key', `concurrent-${i}`)
+              .send({ max_total_tokens: maxTokens }),
+          ),
         );
       }
 
@@ -465,11 +471,13 @@ describeIf('Phase 2 credit core', () => {
 
       for (let i = 0; i < n; i++) {
         requests.push(
-          app
-            .post('/inference')
-            .set('Cookie', admin.cookie)
-            .set('Idempotency-Key', sharedKey)
-            .send({ max_total_tokens: maxTokens }),
+          fire(
+            app
+              .post('/inference')
+              .set('Cookie', admin.cookie)
+              .set('Idempotency-Key', sharedKey)
+              .send({ max_total_tokens: maxTokens }),
+          ),
         );
       }
 
@@ -524,17 +532,23 @@ describeIf('Phase 2 credit core', () => {
     const requests: Promise<supertest.Response>[] = [];
     for (let i = 0; i < n; i++) {
       requests.push(
-        app
-          .post('/billing/webhook')
-          .set('X-Webhook-Signature', webhook.signature)
-          .set('Content-Type', 'application/json')
-          .send(webhook.body),
+        fire(
+          app
+            .post('/billing/webhook')
+            .set('X-Webhook-Signature', webhook.signature)
+            .set('Content-Type', 'application/json')
+            .send(webhook.body),
+        ),
       );
     }
 
     const responses = await Promise.all(requests);
-    const appliedCount = responses.filter((r) => r.status === 200 && r.body.applied).length;
-    const skippedCount = responses.filter((r) => r.status === 204 && !r.body.applied).length;
+    const appliedCount = responses.filter(
+      (r) => r.status === 200 && r.body.applied === true,
+    ).length;
+    const skippedCount = responses.filter(
+      (r) => r.status === 200 && r.body.applied === false,
+    ).length;
 
     expect(appliedCount).toBe(1);
     expect(appliedCount + skippedCount).toBe(n);
@@ -579,11 +593,13 @@ describeIf('Phase 2 credit core', () => {
         const useApp = i % 2 === 0 ? app1 : app2;
         const cookie = i % 2 === 0 ? admin1.cookie : cookie2;
         requests.push(
-          useApp
-            .post('/inference')
-            .set('Cookie', cookie)
-            .set('Idempotency-Key', `two-instance-${i}`)
-            .send({ max_total_tokens: maxTokens }),
+          fire(
+            useApp
+              .post('/inference')
+              .set('Cookie', cookie)
+              .set('Idempotency-Key', `two-instance-${i}`)
+              .send({ max_total_tokens: maxTokens }),
+          ),
         );
       }
 

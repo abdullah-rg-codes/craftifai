@@ -50,7 +50,7 @@ export function buildBillingRouter(logger: Logger, pool: DatabasePool): Router {
         });
       });
 
-      res.status(result.applied ? 200 : 204).json({
+      res.status(200).json({
         applied: result.applied,
         purchase_id: result.purchaseId,
       });
