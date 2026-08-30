@@ -30,11 +30,11 @@ Use **both**:
 
 ## Rejected alternatives
 
-| Alternative | Why rejected |
-|-------------|--------------|
-| DAL-only | One forgotten unscoped query fails silently until production |
-| RLS-only | Every read forced into explicit transactions; worse ergonomics; still needs DAL above for 404 semantics |
-| 403 on cross-tenant | Leaks resource existence; assignment requires non-inferability |
+| Alternative         | Why rejected                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------- |
+| DAL-only            | One forgotten unscoped query fails silently until production                                            |
+| RLS-only            | Every read forced into explicit transactions; worse ergonomics; still needs DAL above for 404 semantics |
+| 403 on cross-tenant | Leaks resource existence; assignment requires non-inferability                                          |
 
 ## Consequences
 

@@ -8,28 +8,28 @@ validated, and where AI output was wrong.
 
 ## Tools used
 
-| Tool | Role |
-|------|------|
-| **Cursor** (Claude) | Primary implementation partner across phases 0–7 |
-| **Design brief** (`craftifai_design_brief_e00b758d.plan.md`) | Human-approved architecture gate before code |
-| **Phase prompts** (`prompts/*.md`) | Scoped instructions per build phase |
-| **CI (GitHub Actions)** | Continuous validation — not AI |
+| Tool                                                         | Role                                             |
+| ------------------------------------------------------------ | ------------------------------------------------ |
+| **Cursor** (Claude)                                          | Primary implementation partner across phases 0–7 |
+| **Design brief** (`craftifai_design_brief_e00b758d.plan.md`) | Human-approved architecture gate before code     |
+| **Phase prompts** (`prompts/*.md`)                           | Scoped instructions per build phase              |
+| **CI (GitHub Actions)**                                      | Continuous validation — not AI                   |
 
 ---
 
 ## Areas substantially AI-generated
 
-| Area | AI contribution | Human validation |
-|------|-------------------|------------------|
-| SQL migrations + RLS policies | Drafted | Reviewed for forced RLS, grants, CHECK constraints |
-| DAL + transaction helper | Drafted | Pool/SET LOCAL trap checked against `known-traps.md` |
-| Credit reserve/settle/release | Drafted | Concurrency tests on real PostgreSQL |
-| Idempotency middleware | Drafted | ON CONFLICT race tests; stale key sweeper |
-| SSRF pinning | Drafted | Unit + integration redirect test |
-| React admin/member pages | Drafted | Manual smoke + credential leak test |
-| Docker Compose + nginx | Drafted | CI compose-e2e, offline overlay, restore test |
-| Load harness | Drafted | CI compose-load; invariant assertions |
-| Phase 7 documentation | Drafted | Cross-checked against code paths |
+| Area                          | AI contribution | Human validation                                     |
+| ----------------------------- | --------------- | ---------------------------------------------------- |
+| SQL migrations + RLS policies | Drafted         | Reviewed for forced RLS, grants, CHECK constraints   |
+| DAL + transaction helper      | Drafted         | Pool/SET LOCAL trap checked against `known-traps.md` |
+| Credit reserve/settle/release | Drafted         | Concurrency tests on real PostgreSQL                 |
+| Idempotency middleware        | Drafted         | ON CONFLICT race tests; stale key sweeper            |
+| SSRF pinning                  | Drafted         | Unit + integration redirect test                     |
+| React admin/member pages      | Drafted         | Manual smoke + credential leak test                  |
+| Docker Compose + nginx        | Drafted         | CI compose-e2e, offline overlay, restore test        |
+| Load harness                  | Drafted         | CI compose-load; invariant assertions                |
+| Phase 7 documentation         | Drafted         | Cross-checked against code paths                     |
 
 ---
 

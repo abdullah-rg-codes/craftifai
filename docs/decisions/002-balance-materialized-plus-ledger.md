@@ -33,11 +33,11 @@ Zero rows → insufficient credit → model never called.
 
 ## Rejected alternatives
 
-| Alternative | Why rejected |
-|-------------|--------------|
-| Ledger-summed-on-read | O(history) reads; still needs serialization point for reserve |
-| Balance-only (no ledger) | Fails auditability invariant; drift undetectable |
-| Trigger-enforced ledger | Trigger cannot carry causation metadata; ownership stays in one module + sum tests |
+| Alternative              | Why rejected                                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| Ledger-summed-on-read    | O(history) reads; still needs serialization point for reserve                      |
+| Balance-only (no ledger) | Fails auditability invariant; drift undetectable                                   |
+| Trigger-enforced ledger  | Trigger cannot carry causation metadata; ownership stays in one module + sum tests |
 
 ## Consequences
 

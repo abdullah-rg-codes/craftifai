@@ -8,14 +8,14 @@ and influence their organization's model URL (SSRF pivot).
 
 ## Assets
 
-| Asset | Impact if compromised |
-|-------|----------------------|
-| Model API keys (per org) | Customer model abuse, data exfil via prompts |
-| Billing webhook secret | Fraudulent credit minting |
-| Session secret / encryption key | Session forgery, credential decryption |
-| Organization credit balances | Direct financial loss |
-| Member PII (email) | Privacy breach |
-| Audit trail | Compliance / forensics loss |
+| Asset                           | Impact if compromised                        |
+| ------------------------------- | -------------------------------------------- |
+| Model API keys (per org)        | Customer model abuse, data exfil via prompts |
+| Billing webhook secret          | Fraudulent credit minting                    |
+| Session secret / encryption key | Session forgery, credential decryption       |
+| Organization credit balances    | Direct financial loss                        |
+| Member PII (email)              | Privacy breach                               |
+| Audit trail                     | Compliance / forensics loss                  |
 
 ---
 
@@ -57,12 +57,12 @@ credits, reservations, purchases, model config, audit.
 
 ## Secret handling
 
-| Secret | Storage | Never appears in |
-|--------|---------|------------------|
-| Model credential | AES-256-GCM ciphertext in PG | API GET, frontend state, logs, git |
-| `WEBHOOK_SECRET` | Env / mount | Responses, client |
-| `SESSION_SECRET` | Env | Client |
-| `ENCRYPTION_KEY_BASE64` | Env / file | Client, logs |
+| Secret                  | Storage                      | Never appears in                   |
+| ----------------------- | ---------------------------- | ---------------------------------- |
+| Model credential        | AES-256-GCM ciphertext in PG | API GET, frontend state, logs, git |
+| `WEBHOOK_SECRET`        | Env / mount                  | Responses, client                  |
+| `SESSION_SECRET`        | Env                          | Client                             |
+| `ENCRYPTION_KEY_BASE64` | Env / file                   | Client, logs                       |
 
 **Structural boundaries:**
 
@@ -127,14 +127,14 @@ Admin connectivity test uses the same pipeline; charges no credits.
 
 ## Out of scope / not defended
 
-| Threat | Why omitted |
-|--------|-------------|
-| DDoS at edge | No WAF/CDN in assignment; rate limits are best-effort Redis |
-| Account enumeration on login | Generic error message; timing side channels not hardened |
-| MFA / password reset | Out of assignment scope |
-| mTLS to customer model | Optional CA bundle only |
-| Supply chain beyond CI audit | Dependabot + pnpm audit + Semgrep/Trivy in CI |
-| Insider with DB superuser | RLS bypass; operational trust boundary |
+| Threat                       | Why omitted                                                 |
+| ---------------------------- | ----------------------------------------------------------- |
+| DDoS at edge                 | No WAF/CDN in assignment; rate limits are best-effort Redis |
+| Account enumeration on login | Generic error message; timing side channels not hardened    |
+| MFA / password reset         | Out of assignment scope                                     |
+| mTLS to customer model       | Optional CA bundle only                                     |
+| Supply chain beyond CI audit | Dependabot + pnpm audit + Semgrep/Trivy in CI               |
+| Insider with DB superuser    | RLS bypass; operational trust boundary                      |
 
 ---
 

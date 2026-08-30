@@ -11,10 +11,10 @@ than a larger happy-path-only build.
 
 ## Prerequisites
 
-| Tool | Version |
-|------|---------|
-| Node.js | 22+ |
-| pnpm | 9+ (repo pins 11.24.0) |
+| Tool             | Version                                      |
+| ---------------- | -------------------------------------------- |
+| Node.js          | 22+                                          |
+| pnpm             | 9+ (repo pins 11.24.0)                       |
 | Docker + Compose | For full stack, integration tests, load test |
 
 ---
@@ -151,18 +151,18 @@ worst-case bound is the 60 s cache TTL if eviction fails.
 
 ## Documentation
 
-| Document | Purpose |
-|----------|---------|
-| [docs/assignment.md](docs/assignment.md) | Original brief |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Components, consistency, scaling to 1M users |
-| [SECURITY.md](SECURITY.md) | Threat model, isolation, secrets, SSRF |
-| [OPERATIONS.md](OPERATIONS.md) | Runbooks, backup, incidents |
-| [AI_USAGE.md](AI_USAGE.md) | AI-assisted development log |
-| [openapi.yaml](openapi.yaml) | HTTP API contract |
-| [docs/decisions/](docs/decisions/) | Architecture decision records |
-| [docs/REQUIREMENT_AUDIT.md](docs/REQUIREMENT_AUDIT.md) | Phase 7 requirement trace |
-| [deploy/README.md](deploy/README.md) | On-prem Compose details |
-| [load/REPORT.md](load/REPORT.md) | Load-test results |
+| Document                                               | Purpose                                      |
+| ------------------------------------------------------ | -------------------------------------------- |
+| [docs/assignment.md](docs/assignment.md)               | Original brief                               |
+| [ARCHITECTURE.md](ARCHITECTURE.md)                     | Components, consistency, scaling to 1M users |
+| [SECURITY.md](SECURITY.md)                             | Threat model, isolation, secrets, SSRF       |
+| [OPERATIONS.md](OPERATIONS.md)                         | Runbooks, backup, incidents                  |
+| [AI_USAGE.md](AI_USAGE.md)                             | AI-assisted development log                  |
+| [openapi.yaml](openapi.yaml)                           | HTTP API contract                            |
+| [docs/decisions/](docs/decisions/)                     | Architecture decision records                |
+| [docs/REQUIREMENT_AUDIT.md](docs/REQUIREMENT_AUDIT.md) | Phase 7 requirement trace                    |
+| [deploy/README.md](deploy/README.md)                   | On-prem Compose details                      |
+| [load/REPORT.md](load/REPORT.md)                       | Load-test results                            |
 
 ---
 

@@ -7,11 +7,11 @@ with managed Postgres, secret rotation, and on-call — the **signals and invari
 
 ## Health checks
 
-| Endpoint | Purpose | Checks | Expected |
-|----------|---------|--------|----------|
-| `GET /health` | Liveness | Process up | `200 {"status":"ok","replica":"..."}` |
-| `GET /ready` | Readiness for LB | PostgreSQL + Redis | `200` or `503` |
-| `GET /metrics` | Prometheus scrape | Counters/histograms | `200 text/plain` |
+| Endpoint       | Purpose           | Checks              | Expected                              |
+| -------------- | ----------------- | ------------------- | ------------------------------------- |
+| `GET /health`  | Liveness          | Process up          | `200 {"status":"ok","replica":"..."}` |
+| `GET /ready`   | Readiness for LB  | PostgreSQL + Redis  | `200` or `503`                        |
+| `GET /metrics` | Prometheus scrape | Counters/histograms | `200 text/plain`                      |
 
 **Important:** Readiness does **not** call the customer model. Model outage must not drain the API pool.
 
@@ -25,16 +25,16 @@ Compose services use `/ready` on API replicas with 20 s start period.
 
 Scrape `GET /api/metrics` through the load balancer or per replica.
 
-| Metric | Meaning |
-|--------|---------|
-| `craftifai_http_requests_total{route,status}` | Request volume by route class |
-| `craftifai_http_request_duration_ms` | End-to-end API time (includes model wait on inference) |
-| `craftifai_model_calls_total{outcome}` | success / timeout / rate_limited / error |
-| `craftifai_model_call_duration_ms` | Outbound model latency |
-| `craftifai_credit_events_total{kind}` | reserve / settle / release |
-| `craftifai_reconciliation_runs_total` | Sweeper acquired lock and ran |
-| `craftifai_reconciliation_lock_miss_total` | Another replica holds lock |
-| `craftifai_reconciliation_expired_reservations_total` | Expired reservations processed |
+| Metric                                                | Meaning                                                |
+| ----------------------------------------------------- | ------------------------------------------------------ |
+| `craftifai_http_requests_total{route,status}`         | Request volume by route class                          |
+| `craftifai_http_request_duration_ms`                  | End-to-end API time (includes model wait on inference) |
+| `craftifai_model_calls_total{outcome}`                | success / timeout / rate_limited / error               |
+| `craftifai_model_call_duration_ms`                    | Outbound model latency                                 |
+| `craftifai_credit_events_total{kind}`                 | reserve / settle / release                             |
+| `craftifai_reconciliation_runs_total`                 | Sweeper acquired lock and ran                          |
+| `craftifai_reconciliation_lock_miss_total`            | Another replica holds lock                             |
+| `craftifai_reconciliation_expired_reservations_total` | Expired reservations processed                         |
 
 **Alert candidates (production):**
 
@@ -218,11 +218,11 @@ Fields: `correlationId`, `method`, `path`, `status`, `durationMs`. Model failure
 
 ## Secret rotation (production guidance)
 
-| Secret | Procedure |
-|--------|-----------|
-| Model credentials | Admin UI write-only rotate; lazy re-encrypt on save |
+| Secret                  | Procedure                                                        |
+| ----------------------- | ---------------------------------------------------------------- |
+| Model credentials       | Admin UI write-only rotate; lazy re-encrypt on save              |
 | `ENCRYPTION_KEY_BASE64` | Add new key version to keyring; decrypt old, re-encrypt on write |
-| `WEBHOOK_SECRET` | Coordinate with billing provider; rotate during maintenance |
-| `SESSION_SECRET` | Rotates cookie signing; invalidates all sessions |
+| `WEBHOOK_SECRET`        | Coordinate with billing provider; rotate during maintenance      |
+| `SESSION_SECRET`        | Rotates cookie signing; invalidates all sessions                 |
 
 Compose reference uses static env — rotation is manual redeploy.

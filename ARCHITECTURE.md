@@ -46,14 +46,14 @@ flowchart TB
   A2 --> MM
 ```
 
-| Component | Role |
-|-----------|------|
-| **React SPA** | Admin + member UI; static assets baked into nginx image |
-| **nginx** | TLS termination (optional), `/api/` load balance, SPA fallback |
-| **API (×2)** | Auth, credits, inference, billing webhook, model config, sweeper |
+| Component      | Role                                                                              |
+| -------------- | --------------------------------------------------------------------------------- |
+| **React SPA**  | Admin + member UI; static assets baked into nginx image                           |
+| **nginx**      | TLS termination (optional), `/api/` load balance, SPA fallback                    |
+| **API (×2)**   | Auth, credits, inference, billing webhook, model config, sweeper                  |
 | **PostgreSQL** | Authoritative state: users, sessions, balances, ledger, reservations, idempotency |
-| **Redis** | Session cache, revocation tombstones, rate limits — not authoritative |
-| **Mock model** | OpenAI-compatible eval endpoint with injectable failures |
+| **Redis**      | Session cache, revocation tombstones, rate limits — not authoritative             |
+| **Mock model** | OpenAI-compatible eval endpoint with injectable failures                          |
 
 Monorepo layout: `apps/api`, `apps/web`, `packages/db` (migrations + DAL), `packages/shared`.
 
@@ -78,13 +78,13 @@ flowchart LR
   end
 ```
 
-| Aspect | SaaS | On-premises |
-|--------|------|-------------|
-| Tenancy | Many orgs, shared DB | Typically one customer; same code path |
-| Model egress | `ALLOWED_PRIVATE_CIDRS` empty — block RFC1918 | Default allows private ranges for LAN model |
-| Secrets | Env / mounted files | Customer-managed mounts |
-| Offline | N/A for prod SaaS | `docker-compose.offline.yml` — internal network only |
-| Scaling | Horizontal API replicas; shared PG/Redis | Same pattern; customer sizes hardware |
+| Aspect       | SaaS                                          | On-premises                                          |
+| ------------ | --------------------------------------------- | ---------------------------------------------------- |
+| Tenancy      | Many orgs, shared DB                          | Typically one customer; same code path               |
+| Model egress | `ALLOWED_PRIVATE_CIDRS` empty — block RFC1918 | Default allows private ranges for LAN model          |
+| Secrets      | Env / mounted files                           | Customer-managed mounts                              |
+| Offline      | N/A for prod SaaS                             | `docker-compose.offline.yml` — internal network only |
+| Scaling      | Horizontal API replicas; shared PG/Redis      | Same pattern; customer sizes hardware                |
 
 The **same binary and schema** serve both; deployment profile differs by configuration only.
 
@@ -119,14 +119,14 @@ sequenceDiagram
 
 ## Consistency model
 
-| Concern | Model | Mechanism |
-|---------|-------|-----------|
-| Credit balance | **Strong per org** | Single row lock on `org_credit_accounts`; guarded UPDATE |
-| Idempotency | **Strong per (org, endpoint, key)** | PK + ON CONFLICT; terminal replay |
-| Webhook credit | **At-most-once apply** | `webhook_events.provider_event_id` PK |
-| Sessions | **Authoritative in PG** | Redis cache; 60 s max stale after revoke |
-| Rate limits | **Eventually consistent** | Redis counters; acceptable for abuse prevention |
-| Sweeper | **Correct without lock** | Conditional updates; advisory lock is efficiency only |
+| Concern        | Model                               | Mechanism                                                |
+| -------------- | ----------------------------------- | -------------------------------------------------------- |
+| Credit balance | **Strong per org**                  | Single row lock on `org_credit_accounts`; guarded UPDATE |
+| Idempotency    | **Strong per (org, endpoint, key)** | PK + ON CONFLICT; terminal replay                        |
+| Webhook credit | **At-most-once apply**              | `webhook_events.provider_event_id` PK                    |
+| Sessions       | **Authoritative in PG**             | Redis cache; 60 s max stale after revoke                 |
+| Rate limits    | **Eventually consistent**           | Redis counters; acceptable for abuse prevention          |
+| Sweeper        | **Correct without lock**            | Conditional updates; advisory lock is efficiency only    |
 
 Isolation level: **READ COMMITTED** throughout. Stronger isolation is unnecessary because every invariant is a single-statement guard, unique constraint, or explicit row lock.
 
@@ -134,16 +134,16 @@ Isolation level: **READ COMMITTED** throughout. Stronger isolation is unnecessar
 
 ## Failure handling
 
-| Failure | Behavior |
-|---------|----------|
-| Insufficient credits | 402 before model contact; idempotency terminal stores 402 |
-| Model timeout / 5xx / 429 / malformed | Release reservation; no net charge |
-| Process kill mid-request | Reservation expires; sweeper refunds |
-| Duplicate idempotency key | Replay or 409 in-progress |
-| Duplicate webhook | Second insert on PK fails; balance unchanged |
-| Redis unavailable | Session cache miss → PG read; rate limit may fail open to 503 |
-| Postgres unavailable | `/ready` 503; no partial credit writes |
-| Model down | Inference fails; **admin/billing APIs stay up** — model excluded from readiness |
+| Failure                               | Behavior                                                                        |
+| ------------------------------------- | ------------------------------------------------------------------------------- |
+| Insufficient credits                  | 402 before model contact; idempotency terminal stores 402                       |
+| Model timeout / 5xx / 429 / malformed | Release reservation; no net charge                                              |
+| Process kill mid-request              | Reservation expires; sweeper refunds                                            |
+| Duplicate idempotency key             | Replay or 409 in-progress                                                       |
+| Duplicate webhook                     | Second insert on PK fails; balance unchanged                                    |
+| Redis unavailable                     | Session cache miss → PG read; rate limit may fail open to 503                   |
+| Postgres unavailable                  | `/ready` 503; no partial credit writes                                          |
+| Model down                            | Inference fails; **admin/billing APIs stay up** — model excluded from readiness |
 
 ---
 
@@ -191,7 +191,7 @@ At 300 rps inference, **~26M reservation rows/day** if every request creates one
 with hot indexes.
 
 **How you know:** p95 reserve latency rises while CPU is moderate (IO wait), or checkpoint
- spikes correlate with inference peaks.
+spikes correlate with inference peaks.
 
 **Move:** Primary + synchronous standby for HA; async read replicas for member/audit lists
 only — **never** for balance writes. Credit correctness stays on the primary.
@@ -203,12 +203,12 @@ practical ceiling ~500–800 inference rps **cluster-wide** before PG becomes th
 
 ### SaaS vs on-prem scaling
 
-| | SaaS | On-prem |
-|---|------|---------|
-| API | Autoscale replicas behind LB | Customer adds CPU/RAM; second API container |
-| PG | Managed HA, read replicas for lists | Customer Postgres HA (Patroni, etc.) |
-| Redis | Cluster for rate limits | Single Redis acceptable at customer scale |
-| Model | Customer endpoints vary | Usually one LAN endpoint — lower SSRF policy surface |
+|       | SaaS                                | On-prem                                              |
+| ----- | ----------------------------------- | ---------------------------------------------------- |
+| API   | Autoscale replicas behind LB        | Customer adds CPU/RAM; second API container          |
+| PG    | Managed HA, read replicas for lists | Customer Postgres HA (Patroni, etc.)                 |
+| Redis | Cluster for rate limits             | Single Redis acceptable at customer scale            |
+| Model | Customer endpoints vary             | Usually one LAN endpoint — lower SSRF policy surface |
 
 ### Multi-region without corrupting balances
 

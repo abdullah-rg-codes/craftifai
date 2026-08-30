@@ -23,11 +23,11 @@ double-charge or double-call the model. Process-local maps fail under two replic
 
 ## Rejected alternatives
 
-| Alternative | Why rejected |
-|-------------|--------------|
-| Catch unique violation then SELECT | Loser can see nothing before winner commits — double charge window |
-| In-memory dedup Map | Fails multi-instance criterion |
-| Record idempotency after work completes | Two concurrent requests both pass the check |
+| Alternative                             | Why rejected                                                       |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| Catch unique violation then SELECT      | Loser can see nothing before winner commits — double charge window |
+| In-memory dedup Map                     | Fails multi-instance criterion                                     |
+| Record idempotency after work completes | Two concurrent requests both pass the check                        |
 
 ## Consequences
 
