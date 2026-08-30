@@ -13,5 +13,8 @@ COPY packages/db packages/db
 COPY apps/api apps/api
 ENV PATH="/app/apps/api/node_modules/.bin:/app/packages/db/node_modules/.bin:/app/node_modules/.bin:${PATH}"
 WORKDIR /app/apps/api
+RUN groupadd --system --gid 10001 craftifai \
+  && useradd --system --uid 10001 --gid craftifai --home-dir /nonexistent --no-create-home --shell /usr/sbin/nologin craftifai
+USER craftifai
 EXPOSE 3000
 CMD ["tsx", "src/index.ts"]

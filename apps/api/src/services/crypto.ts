@@ -15,7 +15,7 @@ export interface EncryptedCredential {
 export async function encryptCredential(plaintext: string): Promise<EncryptedCredential> {
   const key = await env.encryptionKey();
   const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGORITHM, key, iv);
+  const cipher = createCipheriv(ALGORITHM, key, iv, { authTagLength: TAG_LENGTH });
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   return {
@@ -35,7 +35,7 @@ export async function decryptCredential(input: EncryptedCredential): Promise<Sec
   const iv = input.ciphertext.subarray(0, IV_LENGTH);
   const tag = input.ciphertext.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
   const encrypted = input.ciphertext.subarray(IV_LENGTH + TAG_LENGTH);
-  const decipher = createDecipheriv(ALGORITHM, key, iv);
+  const decipher = createDecipheriv(ALGORITHM, key, iv, { authTagLength: TAG_LENGTH });
   decipher.setAuthTag(tag);
   const plaintext = Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
   return new Secret(plaintext);
