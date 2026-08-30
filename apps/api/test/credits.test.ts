@@ -1,4 +1,5 @@
-import { describe, expect, it, beforeAll, beforeEach } from 'vitest';
+import { describe, expect, it, beforeAll, beforeEach, afterAll } from 'vitest';
+import { setTimeout as delay } from 'node:timers/promises';
 import supertest from 'supertest';
 import { createSystemDal, withSystemTransaction, type DatabasePool } from '@craftifai/db';
 import {
@@ -6,10 +7,13 @@ import {
   getCookies,
   hasTestDatabase,
   hasTestRedis,
+  postJson,
   registerAndLogin,
   runMigrations,
   seedCredits,
+  startTestServer,
   truncateTables,
+  type TestHttpResponse,
 } from './helpers.js';
 import { signWebhook } from '../src/services/billing.js';
 import { runReconciliationSweep } from '../src/services/sweeper.js';
@@ -17,14 +21,6 @@ import { createCreditService } from '../src/services/credits.js';
 import { env } from '../src/env.js';
 
 const describeIf = hasTestDatabase() && hasTestRedis() ? describe : describe.skip;
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function fire(request: supertest.Test): Promise<supertest.Response> {
-  return Promise.resolve(request);
-}
 
 async function lockCreditAccount(
   client: { query: (sql: string, params?: unknown[]) => Promise<unknown> },
@@ -36,15 +32,17 @@ async function lockCreditAccount(
   await client.query('SELECT * FROM org_credit_accounts WHERE org_id = $1 FOR UPDATE', [orgId]);
 }
 
-async function countBlockedSessions(
+async function waitForBlockedSessions(
   adminPool: DatabasePool,
   blockerPid: number,
   targetCount: number,
-  timeoutMs = 5000,
+  timeoutMs = 3000,
 ): Promise<number> {
   const deadline = Date.now() + timeoutMs;
   let blockedCount = 0;
-  while (blockedCount < targetCount && Date.now() < deadline) {
+  let lastCount = 0;
+  let stableRounds = 0;
+  while (Date.now() < deadline) {
     blockedCount = await withSystemTransaction(adminPool, async (ctx) => {
       const result = await ctx.query<{ count: string }>(
         `SELECT count(*)::text AS count
@@ -55,11 +53,44 @@ async function countBlockedSessions(
       );
       return Number.parseInt(result.rows[0]?.count ?? '0', 10);
     });
-    if (blockedCount < targetCount) {
-      await delay(10);
+    if (blockedCount >= targetCount && blockedCount === lastCount) {
+      stableRounds += 1;
+      if (stableRounds >= 2) {
+        return blockedCount;
+      }
+    } else {
+      stableRounds = 0;
     }
+    lastCount = blockedCount;
+    await delay(25);
   }
   return blockedCount;
+}
+
+async function runWhileCreditAccountLocked(
+  adminPool: DatabasePool,
+  orgId: string,
+  expectedWaiters: number,
+  startRequests: () => Promise<TestHttpResponse>[],
+): Promise<TestHttpResponse[]> {
+  const blocker = await adminPool.connect();
+  let requests: Promise<TestHttpResponse>[] = [];
+  try {
+    await lockCreditAccount(blocker, orgId);
+    const backend = await blocker.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
+    const blockerPid = backend.rows[0]!.pid;
+    requests = startRequests();
+    await waitForBlockedSessions(adminPool, blockerPid, expectedWaiters);
+    await blocker.query('COMMIT');
+  } catch (error) {
+    await blocker.query('ROLLBACK').catch(() => undefined);
+    await Promise.allSettled(requests);
+    throw error;
+  } finally {
+    await blocker.query('ROLLBACK').catch(() => undefined);
+    blocker.release();
+  }
+  return Promise.all(requests);
 }
 
 describeIf('Phase 2 credit core', () => {
@@ -67,18 +98,30 @@ describeIf('Phase 2 credit core', () => {
   let pool: DatabasePool;
   let adminPool: DatabasePool;
   let redis: Awaited<ReturnType<typeof createTestApp>>['redis'];
+  let serverUrl: string;
+  let closeServer: () => Promise<void>;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     runMigrations();
     const testApp = createTestApp();
     app = testApp.app;
     pool = testApp.pool;
     adminPool = testApp.adminPool;
     redis = testApp.redis;
+    const listening = await startTestServer(testApp.expressApp);
+    serverUrl = listening.url;
+    closeServer = listening.close;
   });
 
   beforeEach(async () => {
     await truncateTables(adminPool, redis);
+  });
+
+  afterAll(async () => {
+    await closeServer?.();
+    await redis?.quit();
+    await pool?.end();
+    await adminPool?.end();
   });
 
   it('seeds an account with a matching ledger entry and zero balance', async () => {
@@ -404,37 +447,19 @@ describeIf('Phase 2 credit core', () => {
     await seedCredits(adminPool, admin.orgId, credits);
 
     const n = 10;
-    const maxTokens = 1000; // 1 credit each
+    const maxTokens = 1000;
     const expectedSuccess = credits;
 
-    const blocker = await adminPool.connect();
-    const requests: Promise<supertest.Response>[] = [];
-    try {
-      await lockCreditAccount(blocker, admin.orgId);
-      const backend = await blocker.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
-      const blockerPid = backend.rows[0]!.pid;
+    const responses = await runWhileCreditAccountLocked(adminPool, admin.orgId, n, () =>
+      Array.from({ length: n }, (_, i) =>
+        postJson(serverUrl, '/inference', {
+          cookie: admin.cookie,
+          headers: { 'Idempotency-Key': `concurrent-${i}` },
+          body: { max_total_tokens: maxTokens },
+        }),
+      ),
+    );
 
-      for (let i = 0; i < n; i++) {
-        requests.push(
-          fire(
-            app
-              .post('/inference')
-              .set('Cookie', admin.cookie)
-              .set('Idempotency-Key', `concurrent-${i}`)
-              .send({ max_total_tokens: maxTokens }),
-          ),
-        );
-      }
-
-      const blocked = await countBlockedSessions(adminPool, blockerPid, n, 5000);
-      expect(blocked).toBeGreaterThanOrEqual(n);
-
-      await blocker.query('COMMIT');
-    } finally {
-      blocker.release();
-    }
-
-    const responses = await Promise.all(requests);
     const successCount = responses.filter((r) => r.status === 200).length;
     const failureCount = responses.filter((r) => r.status === 402).length;
 
@@ -462,32 +487,16 @@ describeIf('Phase 2 credit core', () => {
     const maxTokens = 1000;
     const sharedKey = 'shared-idempotency-key';
 
-    const blocker = await adminPool.connect();
-    const requests: Promise<supertest.Response>[] = [];
-    try {
-      await lockCreditAccount(blocker, admin.orgId);
-      const backend = await blocker.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
-      const blockerPid = backend.rows[0]!.pid;
+    const responses = await runWhileCreditAccountLocked(adminPool, admin.orgId, 1, () =>
+      Array.from({ length: n }, () =>
+        postJson(serverUrl, '/inference', {
+          cookie: admin.cookie,
+          headers: { 'Idempotency-Key': sharedKey },
+          body: { max_total_tokens: maxTokens },
+        }),
+      ),
+    );
 
-      for (let i = 0; i < n; i++) {
-        requests.push(
-          fire(
-            app
-              .post('/inference')
-              .set('Cookie', admin.cookie)
-              .set('Idempotency-Key', sharedKey)
-              .send({ max_total_tokens: maxTokens }),
-          ),
-        );
-      }
-
-      await countBlockedSessions(adminPool, blockerPid, n, 5000);
-      await blocker.query('COMMIT');
-    } finally {
-      blocker.release();
-    }
-
-    const responses = await Promise.all(requests);
     const successResponses = responses.filter((r) => r.status === 200);
     const inProgressResponses = responses.filter((r) => r.status === 409);
 
@@ -529,20 +538,15 @@ describeIf('Phase 2 credit core', () => {
     );
 
     const n = 10;
-    const requests: Promise<supertest.Response>[] = [];
-    for (let i = 0; i < n; i++) {
-      requests.push(
-        fire(
-          app
-            .post('/billing/webhook')
-            .set('X-Webhook-Signature', webhook.signature)
-            .set('Content-Type', 'application/json')
-            .send(webhook.body),
-        ),
-      );
-    }
+    const responses = await Promise.all(
+      Array.from({ length: n }, () =>
+        postJson(serverUrl, '/billing/webhook', {
+          headers: { 'X-Webhook-Signature': webhook.signature },
+          rawBody: webhook.body,
+        }),
+      ),
+    );
 
-    const responses = await Promise.all(requests);
     const appliedCount = responses.filter(
       (r) => r.status === 200 && r.body.applied === true,
     ).length;
@@ -566,60 +570,52 @@ describeIf('Phase 2 credit core', () => {
   it('two API instances sharing one database preserve credit invariants', async () => {
     const testApp1 = createTestApp();
     const testApp2 = createTestApp();
-    const app1 = testApp1.app;
-    const app2 = testApp2.app;
+    const server1 = await startTestServer(testApp1.expressApp);
+    const server2 = await startTestServer(testApp2.expressApp);
 
-    const admin1 = await registerAndLogin(app1, 'two-instance-admin@example.com');
-    await seedCredits(testApp1.adminPool, admin1.orgId, 3);
-
-    // Also log the same admin into app2 so the session is resolved from the shared Redis.
-    const login2 = await app2
-      .post('/auth/login')
-      .send({ email: 'two-instance-admin@example.com', password: 'password123' })
-      .expect(200);
-    const cookie2 = getCookies(login2);
-
-    const n = 6;
-    const maxTokens = 1000;
-
-    const blocker = await testApp1.adminPool.connect();
-    const requests: Promise<supertest.Response>[] = [];
     try {
-      await lockCreditAccount(blocker, admin1.orgId);
-      const backend = await blocker.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
-      const blockerPid = backend.rows[0]!.pid;
+      const admin1 = await registerAndLogin(testApp1.app, 'two-instance-admin@example.com');
+      await seedCredits(testApp1.adminPool, admin1.orgId, 3);
 
-      for (let i = 0; i < n; i++) {
-        const useApp = i % 2 === 0 ? app1 : app2;
-        const cookie = i % 2 === 0 ? admin1.cookie : cookie2;
-        requests.push(
-          fire(
-            useApp
-              .post('/inference')
-              .set('Cookie', cookie)
-              .set('Idempotency-Key', `two-instance-${i}`)
-              .send({ max_total_tokens: maxTokens }),
-          ),
-        );
-      }
+      const login2 = await testApp2.app
+        .post('/auth/login')
+        .send({ email: 'two-instance-admin@example.com', password: 'password123' })
+        .expect(200);
+      const cookie2 = getCookies(login2);
 
-      await countBlockedSessions(testApp1.adminPool, blockerPid, n, 5000);
-      await blocker.query('COMMIT');
+      const n = 6;
+      const maxTokens = 1000;
+
+      const responses = await runWhileCreditAccountLocked(testApp1.adminPool, admin1.orgId, n, () =>
+        Array.from({ length: n }, (_, i) =>
+          postJson(i % 2 === 0 ? server1.url : server2.url, '/inference', {
+            cookie: i % 2 === 0 ? admin1.cookie : cookie2,
+            headers: { 'Idempotency-Key': `two-instance-${i}` },
+            body: { max_total_tokens: maxTokens },
+          }),
+        ),
+      );
+
+      const successCount = responses.filter((r) => r.status === 200).length;
+      expect(successCount).toBe(3);
+
+      const account = await testApp1.app
+        .get('/credits/account')
+        .set('Cookie', admin1.cookie)
+        .expect(200);
+      expect(account.body.available).toBe(0);
+      expect(account.body.reserved).toBe(0);
     } finally {
-      blocker.release();
+      await Promise.allSettled([
+        server1.close(),
+        server2.close(),
+        testApp1.redis.quit(),
+        testApp2.redis.quit(),
+        testApp1.pool.end(),
+        testApp2.pool.end(),
+        testApp1.adminPool.end(),
+        testApp2.adminPool.end(),
+      ]);
     }
-
-    const responses = await Promise.all(requests);
-    const successCount = responses.filter((r) => r.status === 200).length;
-    expect(successCount).toBe(3);
-
-    const account = await app1.get('/credits/account').set('Cookie', admin1.cookie).expect(200);
-    expect(account.body.available).toBe(0);
-    expect(account.body.reserved).toBe(0);
-
-    await testApp1.pool.end();
-    await testApp1.redis.quit();
-    await testApp2.pool.end();
-    await testApp2.redis.quit();
   });
 });
