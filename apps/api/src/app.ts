@@ -6,6 +6,8 @@ import { withSystemTransaction, type DatabasePool } from '@craftifai/db';
 import type { Logger } from './logger.js';
 import { createErrorHandler } from './errors.js';
 import { sessionSecret } from './env.js';
+import { inflightMiddleware } from './inflight.js';
+import { observeHttp, renderMetrics } from './metrics.js';
 import { extractSessionToken, resolveAuthContext, type AuthContext } from './auth.js';
 import { buildAuthRouter } from './routes/auth.js';
 import { buildOrgsRouter } from './routes/orgs.js';
@@ -30,6 +32,7 @@ function asyncMiddleware(
 export function buildApp(logger: Logger, pool: DatabasePool, redis: Redis): express.Application {
   const app = express();
 
+  app.use(inflightMiddleware);
   app.use(express.json({ verify: attachRawBody }));
   app.use(cookieParser(sessionSecret()));
 
@@ -38,13 +41,20 @@ export function buildApp(logger: Logger, pool: DatabasePool, redis: Redis): expr
     res.setHeader('X-Correlation-ID', req.correlationId);
     const startedAt = performance.now();
     res.on('finish', () => {
+      const durationMs = Math.round((performance.now() - startedAt) * 100) / 100;
+      observeHttp({
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        durationMs,
+      });
       logger.info(
         {
           correlationId: req.correlationId,
           method: req.method,
           path: req.path,
           status: res.statusCode,
-          durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+          durationMs,
         },
         'request completed',
       );
@@ -53,7 +63,14 @@ export function buildApp(logger: Logger, pool: DatabasePool, redis: Redis): expr
   });
 
   app.get('/health', (_req, res) => {
-    res.status(200).json({ status: 'ok' });
+    res.status(200).json({
+      status: 'ok',
+      replica: process.env.HOSTNAME ?? 'local',
+    });
+  });
+
+  app.get('/metrics', (_req, res) => {
+    res.status(200).type('text/plain; version=0.0.4; charset=utf-8').send(renderMetrics());
   });
 
   app.get(

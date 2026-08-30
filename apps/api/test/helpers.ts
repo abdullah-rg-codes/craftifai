@@ -18,6 +18,7 @@ import { encryptCredential } from '../src/services/crypto.js';
 import type { Application } from 'express';
 import type { Redis } from 'ioredis';
 import type { DatabasePool } from '@craftifai/db';
+import { RemoteAgent, testBaseUrl, type TestAgent } from './remoteAgent.js';
 
 export function hasTestDatabase(): boolean {
   try {
@@ -54,12 +55,20 @@ export function createTestApp(options: { logger?: ReturnType<typeof createLogger
     max: 8,
   });
   const expressApp = buildApp(logger, pool, redis) as Application;
-  return { app: supertest(expressApp), expressApp, pool, adminPool, redis, logger };
+  const remote = testBaseUrl();
+  const app: TestAgent = remote
+    ? new RemoteAgent(remote)
+    : (supertest(expressApp) as unknown as TestAgent);
+  return { app, expressApp, pool, adminPool, redis, logger };
 }
 
 export async function startTestServer(
   expressApp: Application,
 ): Promise<{ url: string; close: () => Promise<void> }> {
+  const remote = testBaseUrl();
+  if (remote) {
+    return { url: remote, close: async () => undefined };
+  }
   const server = http.createServer(expressApp);
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
@@ -183,14 +192,14 @@ export async function directAddMember(
   });
 }
 
-export function getCookies(response: supertest.Response): string[] {
+export function getCookies(response: { headers: Record<string, unknown> }): string[] {
   const header = response.headers['set-cookie'];
   if (!header) return [];
-  return Array.isArray(header) ? header : [header];
+  return Array.isArray(header) ? header.map(String) : [String(header)];
 }
 
 export async function registerAndLogin(
-  app: ReturnType<typeof supertest>,
+  app: TestAgent,
   email: string,
 ): Promise<{ userId: string; orgId: string; cookie: string[] }> {
   const registerResponse = await app
@@ -210,11 +219,7 @@ export async function registerAndLogin(
   };
 }
 
-export async function login(
-  app: ReturnType<typeof supertest>,
-  email: string,
-  password: string,
-): Promise<string[]> {
+export async function login(app: TestAgent, email: string, password: string): Promise<string[]> {
   const response = await app.post('/auth/login').send({ email, password });
   if (response.status !== 200) {
     throw new Error(`Login failed: ${response.status} ${response.text}`);

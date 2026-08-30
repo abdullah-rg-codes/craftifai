@@ -1,6 +1,5 @@
 import { Writable } from 'node:stream';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import supertest from 'supertest';
 import pino from 'pino';
 import { withSystemTransaction, type DatabasePool } from '@craftifai/db';
 import { buildMockModelApp } from '@craftifai/mock-model/app';
@@ -15,10 +14,12 @@ import {
   startTestServer,
   truncateTables,
 } from './helpers.js';
+import { mockModelUrl } from './remoteAgent.js';
 import { createLogger } from '../src/logger.js';
 
 const describeIf = hasTestDatabase() && hasTestRedis() ? describe : describe.skip;
-const MOCK_MODEL_KEY = 'gateway-model-secret';
+const MOCK_MODEL_KEY = process.env.MOCK_MODEL_API_KEY ?? 'test-model-secret';
+const throughLoadBalancer = Boolean(process.env.TEST_BASE_URL);
 
 function captureLogger(): { logger: ReturnType<typeof createLogger>; lines: string[] } {
   const lines: string[] = [];
@@ -32,7 +33,7 @@ function captureLogger(): { logger: ReturnType<typeof createLogger>; lines: stri
 }
 
 describeIf('Phase 3 model gateway', () => {
-  let app: ReturnType<typeof supertest>;
+  let app: ReturnType<typeof createTestApp>['app'];
   let pool: DatabasePool;
   let adminPool: DatabasePool;
   let redis: Awaited<ReturnType<typeof createTestApp>>['redis'];
@@ -82,9 +83,15 @@ describeIf('Phase 3 model gateway', () => {
     pool = testApp.pool;
     adminPool = testApp.adminPool;
     redis = testApp.redis;
-    const mock = await startTestServer(buildMockModelApp());
-    mockUrl = mock.url;
-    closeMock = mock.close;
+    const fixtureMock = mockModelUrl();
+    if (fixtureMock) {
+      mockUrl = fixtureMock;
+      closeMock = async () => undefined;
+    } else {
+      const mock = await startTestServer(buildMockModelApp());
+      mockUrl = mock.url;
+      closeMock = mock.close;
+    }
   });
 
   beforeEach(async () => {
@@ -223,7 +230,7 @@ describeIf('Phase 3 model gateway', () => {
       .expect(201);
   });
 
-  it('rate-limits across the shared Redis keyspace', async () => {
+  it.skipIf(throughLoadBalancer)('rate-limits across the shared Redis keyspace', async () => {
     const previousOrg = process.env.RATE_LIMIT_ORG_PER_MINUTE;
     const previousUser = process.env.RATE_LIMIT_USER_PER_MINUTE;
     process.env.RATE_LIMIT_ORG_PER_MINUTE = '2';
@@ -288,7 +295,7 @@ describeIf('Phase 3 model gateway', () => {
     expect(await balance(admin.cookie)).toEqual({ available: 4, reserved: 0 });
   });
 
-  it('never writes the credential into log output', async () => {
+  it.skipIf(throughLoadBalancer)('never writes the credential into log output', async () => {
     const admin = await registerAndLogin(app, 'gateway-logs@example.com');
     await seedCredits(adminPool, admin.orgId, 10);
     await app
@@ -312,24 +319,27 @@ describeIf('Phase 3 model gateway', () => {
     expect(joined).not.toContain('"hello"');
   });
 
-  it('rejects a stored loopback endpoint when private allowance is empty', async () => {
-    const previous = process.env.ALLOWED_PRIVATE_CIDRS;
-    process.env.ALLOWED_PRIVATE_CIDRS = '';
-    try {
-      const admin = await registerAndLogin(app, 'gateway-ssrf-save@example.com');
-      await app
-        .put('/model-config')
-        .set('Cookie', admin.cookie)
-        .send({
-          endpoint_url: 'http://127.0.0.1/v1/chat/completions',
-          model_name: 'blocked',
-          credential: MOCK_MODEL_KEY,
-        })
-        .expect(400);
-    } finally {
-      process.env.ALLOWED_PRIVATE_CIDRS = previous ?? '127.0.0.0/8';
-    }
-  });
+  it.skipIf(throughLoadBalancer)(
+    'rejects a stored loopback endpoint when private allowance is empty',
+    async () => {
+      const previous = process.env.ALLOWED_PRIVATE_CIDRS;
+      process.env.ALLOWED_PRIVATE_CIDRS = '';
+      try {
+        const admin = await registerAndLogin(app, 'gateway-ssrf-save@example.com');
+        await app
+          .put('/model-config')
+          .set('Cookie', admin.cookie)
+          .send({
+            endpoint_url: 'http://127.0.0.1/v1/chat/completions',
+            model_name: 'blocked',
+            credential: MOCK_MODEL_KEY,
+          })
+          .expect(400);
+      } finally {
+        process.env.ALLOWED_PRIVATE_CIDRS = previous ?? '127.0.0.0/8';
+      }
+    },
+  );
 
   it('sums ledger deltas back to the account after a failed call', async () => {
     const admin = await registerAndLogin(app, 'gateway-ledger@example.com');

@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeAll, beforeEach, afterAll } from 'vitest';
 import { setTimeout as delay } from 'node:timers/promises';
-import supertest from 'supertest';
 import { createSystemDal, withSystemTransaction, type DatabasePool } from '@craftifai/db';
 import {
   createTestApp,
@@ -16,6 +15,7 @@ import {
   truncateTables,
   type TestHttpResponse,
 } from './helpers.js';
+import { mockModelUrl } from './remoteAgent.js';
 import { buildMockModelApp } from '@craftifai/mock-model/app';
 import { signWebhook } from '../src/services/billing.js';
 import { runReconciliationSweep } from '../src/services/sweeper.js';
@@ -23,7 +23,7 @@ import { createCreditService } from '../src/services/credits.js';
 import { env } from '../src/env.js';
 
 const describeIf = hasTestDatabase() && hasTestRedis() ? describe : describe.skip;
-const MOCK_MODEL_KEY = 'test-model-secret';
+const MOCK_MODEL_KEY = process.env.MOCK_MODEL_API_KEY ?? 'test-model-secret';
 
 async function lockCreditAccount(
   client: { query: (sql: string, params?: unknown[]) => Promise<unknown> },
@@ -97,7 +97,7 @@ async function runWhileCreditAccountLocked(
 }
 
 describeIf('Phase 2 credit core', () => {
-  let app: ReturnType<typeof supertest>;
+  let app: ReturnType<typeof createTestApp>['app'];
   let pool: DatabasePool;
   let adminPool: DatabasePool;
   let redis: Awaited<ReturnType<typeof createTestApp>>['redis'];
@@ -133,9 +133,15 @@ describeIf('Phase 2 credit core', () => {
     const listening = await startTestServer(testApp.expressApp);
     serverUrl = listening.url;
     closeServer = listening.close;
-    const mock = await startTestServer(buildMockModelApp());
-    mockUrl = mock.url;
-    closeMock = mock.close;
+    const fixtureMock = mockModelUrl();
+    if (fixtureMock) {
+      mockUrl = fixtureMock;
+      closeMock = async () => undefined;
+    } else {
+      const mock = await startTestServer(buildMockModelApp());
+      mockUrl = mock.url;
+      closeMock = mock.close;
+    }
   });
 
   beforeEach(async () => {
@@ -650,6 +656,29 @@ describeIf('Phase 2 credit core', () => {
   });
 
   it('two API instances sharing one database preserve credit invariants', async () => {
+    const remote = process.env.TEST_BASE_URL;
+    if (remote) {
+      const admin = await registerAndLogin(app, 'two-instance-admin@example.com');
+      await seedCredits(adminPool, admin.orgId, 3);
+      await enableModel(admin.orgId);
+      const n = 6;
+      const maxTokens = 1000;
+      const responses = await runWhileCreditAccountLocked(adminPool, admin.orgId, n, () =>
+        Array.from({ length: n }, (_, i) =>
+          postJson(remote, '/inference', {
+            cookie: admin.cookie,
+            headers: { 'Idempotency-Key': `two-instance-${String(i)}` },
+            body: { max_total_tokens: maxTokens },
+          }),
+        ),
+      );
+      const successCount = responses.filter((r) => r.status === 200).length;
+      expect(successCount).toBe(3);
+      const account = await app.get('/credits/account').set('Cookie', admin.cookie).expect(200);
+      expect(account.body.available).toBe(0);
+      expect(account.body.reserved).toBe(0);
+      return;
+    }
     const testApp1 = createTestApp();
     const testApp2 = createTestApp();
     const server1 = await startTestServer(testApp1.expressApp);

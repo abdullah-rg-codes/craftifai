@@ -1,5 +1,6 @@
 import { calculateCreditsFromTokens } from '@craftifai/shared';
 import type { OrgDal } from '@craftifai/db';
+import { observeCredit } from '../metrics.js';
 
 export interface ReservationResult {
   reservationId: string;
@@ -67,6 +68,7 @@ export function createCreditService(dal: OrgDal) {
         deltaReserved: credits,
         reservationId: reservation.id,
       });
+      observeCredit('reserve');
       return {
         reservationId: reservation.id,
         reservedCredits: credits,
@@ -107,6 +109,7 @@ export function createCreditService(dal: OrgDal) {
         deltaReserved: -reservation.reserved_credits,
         reservationId: reservation.id,
       });
+      observeCredit('settle');
       return {
         reservationId: reservation.id,
         settledCredits,
@@ -135,6 +138,7 @@ export function createCreditService(dal: OrgDal) {
         deltaReserved: -reservation.reserved_credits,
         reservationId: reservation.id,
       });
+      observeCredit('release');
       return {
         reservationId: reservation.id,
         releasedCredits: reservation.reserved_credits,
@@ -162,6 +166,7 @@ export function createCreditService(dal: OrgDal) {
         deltaReserved: -reservation.reserved_credits,
         reservationId: reservation.id,
       });
+      observeCredit('release');
       return {
         reservationId: reservation.id,
         releasedCredits: reservation.reserved_credits,

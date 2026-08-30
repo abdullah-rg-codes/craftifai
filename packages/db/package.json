@@ -14,12 +14,12 @@
     "migrate:down": "tsx ./src/migrate.ts down"
   },
   "dependencies": {
-    "pg": "^8.15.6"
+    "dbmate": "^2.26.0",
+    "pg": "^8.15.6",
+    "tsx": "^4.19.4"
   },
   "devDependencies": {
     "@types/pg": "^8.15.3",
-    "dbmate": "^2.26.0",
-    "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }
 }

@@ -3,6 +3,7 @@ import https from 'node:https';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { Logger } from '../logger.js';
 import { env } from '../env.js';
+import { observeModel } from '../metrics.js';
 import type { Secret } from '@craftifai/shared';
 import { pinUrl, SsrfBlockedError, type PinnedTarget, type SsrfPolicy } from './ssrf.js';
 
@@ -27,6 +28,23 @@ export type ModelCallFailure =
   | { kind: 'unavailable'; message: string }
   | { kind: 'malformed'; message: string }
   | { kind: 'ssrf'; message: string };
+
+let extraCaBundle: Buffer | undefined;
+
+export function setExtraCaBundle(bundle: Buffer | undefined): void {
+  extraCaBundle = bundle;
+}
+
+function tlsCaList(orgBundle?: Buffer): Buffer[] | undefined {
+  const list: Buffer[] = [];
+  if (extraCaBundle) {
+    list.push(extraCaBundle);
+  }
+  if (orgBundle) {
+    list.push(orgBundle);
+  }
+  return list.length > 0 ? list : undefined;
+}
 
 export class ModelCallError extends Error {
   readonly failure: ModelCallFailure;
@@ -160,8 +178,9 @@ async function requestPinned(
   };
   if (target.protocol === 'https:') {
     requestOptions.servername = target.hostname;
-    if (input.caBundle) {
-      requestOptions.ca = input.caBundle;
+    const cas = tlsCaList(input.caBundle);
+    if (cas) {
+      requestOptions.ca = cas;
     }
   }
 
@@ -261,12 +280,14 @@ export async function callChatModel(
     }
     try {
       const result = await callOnce(input, logger);
+      const latencyMs = Math.round(performance.now() - startedAt);
+      observeModel({ outcome: 'success', durationMs: latencyMs });
       logger.info(
         {
           correlationId: input.correlationId,
           model: input.modelName,
           outcome: 'success',
-          latencyMs: Math.round(performance.now() - startedAt),
+          latencyMs,
           totalTokens: result.usage.total_tokens,
           ...(logModelContentEnabled() ? { messages: input.messages } : { promptLogged: false }),
         },
@@ -285,6 +306,10 @@ export async function callChatModel(
         (error.failure.kind === 'unavailable' && !headersReceived) ||
         (error.failure.kind === 'unavailable' && error.message.includes('HTTP 5'));
       if (!retryable || attempt === maxRetries) {
+        observeModel({
+          outcome: error.failure.kind,
+          durationMs: Math.round(performance.now() - startedAt),
+        });
         logger.info(
           {
             correlationId: input.correlationId,

@@ -26,7 +26,8 @@
     "db:drop": "pnpm --filter db drop",
     "compose:up": "docker compose up --build -d",
     "compose:down": "docker compose down -v",
-    "compose:logs": "docker compose logs -f"
+    "compose:logs": "docker compose logs -f",
+    "test:compose": "vitest run --fileParallelism=false apps/api/test/foundation.test.ts apps/api/test/credits.test.ts apps/api/test/gateway.test.ts apps/api/test/compose.lb.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.26.0",

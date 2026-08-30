@@ -21,12 +21,28 @@ export function redisUrl(): string {
 }
 
 export function encryptionKey(): Promise<Buffer> {
-  const base64 = requireEnv('ENCRYPTION_KEY_BASE64');
-  const key = Buffer.from(base64, 'base64');
-  if (key.length !== 32) {
-    return Promise.reject(new Error('ENCRYPTION_KEY_BASE64 must decode to exactly 32 bytes'));
-  }
-  return Promise.resolve(key);
+  const filePath = process.env.ENCRYPTION_KEY_FILE;
+  const fromEnv = process.env.ENCRYPTION_KEY_BASE64;
+  const source = filePath
+    ? readMountedSecret(filePath)
+    : fromEnv
+      ? Promise.resolve(fromEnv)
+      : Promise.reject(
+          new Error(
+            'Missing required environment variable: ENCRYPTION_KEY_BASE64 or ENCRYPTION_KEY_FILE',
+          ),
+        );
+  return source.then((base64) => {
+    const key = Buffer.from(base64, 'base64');
+    if (key.length !== 32) {
+      throw new Error(
+        filePath
+          ? 'ENCRYPTION_KEY_FILE must decode to exactly 32 bytes'
+          : 'ENCRYPTION_KEY_BASE64 must decode to exactly 32 bytes',
+      );
+    }
+    return key;
+  });
 }
 
 export function sessionSecret(): string {

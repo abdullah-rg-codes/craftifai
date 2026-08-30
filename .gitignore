@@ -14,6 +14,7 @@ build/
 *.pem
 *.key
 *.secret
+!apps/api/test/fixtures/*.pem
 
 # Logs
 logs/
@@ -41,6 +42,4 @@ coverage/
 # Local throwaway Postgres/Redis when Docker is unavailable
 .local-infra/
 
-# Database dumps
-*.dump
-*.sql.gz
+backups/

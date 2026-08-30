@@ -346,6 +346,16 @@ function createDal(ctx: TransactionContext) {
           [orgId, userId],
         );
       },
+      async hasAnyAdministrator(): Promise<boolean> {
+        const row = await one<{ present: number }>(
+          ctx,
+          `SELECT 1 AS present
+             FROM memberships
+            WHERE role = 'administrator' AND status = 'active'
+            LIMIT 1`,
+        );
+        return row !== undefined;
+      },
       async findByOrgAndEmail(orgId: string, email: string): Promise<DbMembership | undefined> {
         return one<DbMembership>(
           ctx,

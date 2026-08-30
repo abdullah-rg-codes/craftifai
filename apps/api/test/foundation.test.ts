@@ -13,7 +13,7 @@ import {
   login,
   getCookies,
 } from './helpers.js';
-import type supertest from 'supertest';
+import { TestResponse } from './remoteAgent.js';
 
 const enabled = hasTestDatabase() && hasTestRedis();
 const describeIf = enabled ? describe : describe.skip;
@@ -53,7 +53,7 @@ describeIf('Phase 1 foundation', () => {
 
   it('reports liveness independently and readiness only when PostgreSQL and Redis respond', async () => {
     const health = await app.get('/health').expect(200);
-    expect(health.body).toEqual({ status: 'ok' });
+    expect(health.body).toMatchObject({ status: 'ok' });
     expect(health.headers['x-correlation-id']).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
@@ -381,7 +381,7 @@ describeIf('Phase 1 foundation', () => {
       .get('/auth/me')
       .set('Cookie', cookie)
       .expect(200)
-      .then((res: supertest.Response) => expect(res.body.user_id).toBe(member.id));
+      .then((res) => expect(res.body.user_id).toBe(member.id));
 
     const memberMembershipId = await getMembershipId(pool, admin.orgId, member.id);
     await app
@@ -476,7 +476,7 @@ describeIf('Phase 1 foundation', () => {
     const m2 = await getMembershipId(pool, org.id, admin2.id);
 
     const blocker = await adminPool.connect();
-    let requests: Promise<[supertest.Response, supertest.Response]> | undefined;
+    let requests: Promise<[TestResponse, TestResponse]> | undefined;
     let blockedCount = 0;
     try {
       await blocker.query('BEGIN');

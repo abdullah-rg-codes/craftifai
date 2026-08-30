@@ -1,0 +1,5 @@
+# Offline overlay: containers can reach each other but not the internet.
+# Do not use this overlay when the customer model lives on a LAN route.
+networks:
+  default:
+    internal: true

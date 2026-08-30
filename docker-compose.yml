@@ -1,3 +1,19 @@
+x-api-environment: &api-environment
+  NODE_ENV: production
+  API_PORT: '3000'
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  DATABASE_URL: postgres://craftifai_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-craftifai}?sslmode=disable
+  REDIS_URL: redis://redis:6379/0
+  SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+  WEBHOOK_SECRET: ${WEBHOOK_SECRET:?set WEBHOOK_SECRET}
+  ENCRYPTION_KEY_BASE64: ${ENCRYPTION_KEY_BASE64:?set ENCRYPTION_KEY_BASE64}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  ALLOWED_PRIVATE_CIDRS: ${ALLOWED_PRIVATE_CIDRS:-10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.0/8}
+  RATE_LIMIT_ORG_PER_MINUTE: ${RATE_LIMIT_ORG_PER_MINUTE:-600}
+  RATE_LIMIT_USER_PER_MINUTE: ${RATE_LIMIT_USER_PER_MINUTE:-300}
+  MODEL_TIMEOUT_MS: ${MODEL_TIMEOUT_MS:-30000}
+  MODEL_MAX_RETRIES: ${MODEL_MAX_RETRIES:-2}
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -11,11 +27,12 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./packages/db/init:/docker-entrypoint-initdb.d:ro
+      - ./backups:/backups
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -31,11 +48,12 @@ services:
 
   mock-model:
     build: ./apps/mock-model
+    pull_policy: never
     ports:
       - '8081:8081'
     environment:
       MOCK_MODEL_PORT: 8081
-      MOCK_MODEL_API_KEY: ${MOCK_MODEL_API_KEY:-dev-model-key}
+      MOCK_MODEL_API_KEY: ${MOCK_MODEL_API_KEY:?set MOCK_MODEL_API_KEY}
     healthcheck:
       test:
         [
@@ -47,6 +65,116 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    pull_policy: never
+    working_dir: /app/packages/db
+    command: ['tsx', 'src/migrate.ts', 'up']
+    environment:
+      DATABASE_ADMIN_URL: postgres://${POSTGRES_ADMIN_USER:-craftifai_owner}:${POSTGRES_ADMIN_PASSWORD}@postgres:5432/${POSTGRES_DB:-craftifai}?sslmode=disable
+      DATABASE_URL: postgres://craftifai_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-craftifai}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api-1:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    pull_policy: never
+    hostname: api-1
+    stop_grace_period: 15s
+    environment:
+      <<: *api-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      mock-model:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+
+  api-2:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    pull_policy: never
+    hostname: api-2
+    stop_grace_period: 15s
+    environment:
+      <<: *api-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      mock-model:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+
+  proxy:
+    build:
+      context: .
+      dockerfile: deploy/nginx/Dockerfile
+    pull_policy: never
+    ports:
+      - '80:80'
+    depends_on:
+      api-1:
+        condition: service_healthy
+      api-2:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1/api/health']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  bootstrap:
+    profiles: ['bootstrap']
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    pull_policy: never
+    working_dir: /app/apps/api
+    command: ['tsx', 'src/bootstrap.ts']
+    environment:
+      <<: *api-environment
+      BOOTSTRAP_EMAIL: ${BOOTSTRAP_EMAIL:-}
+      BOOTSTRAP_PASSWORD: ${BOOTSTRAP_PASSWORD:-}
+      BOOTSTRAP_EMAIL_FILE: ${BOOTSTRAP_EMAIL_FILE:-}
+      BOOTSTRAP_PASSWORD_FILE: ${BOOTSTRAP_PASSWORD_FILE:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:

@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import type { Redis } from 'ioredis';
 import { withSystemTransaction, createSystemDal, type DatabasePool } from '@craftifai/db';
 import { hashPassword, verifyPassword, AppError, unauthorized } from '@craftifai/shared';
+import { cookieSecure } from './env.js';
 
 const SESSION_COOKIE = 'craftifai_session';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
@@ -219,7 +220,7 @@ export async function extractSessionToken(req: Request): Promise<string | undefi
 export function setSessionCookie(res: Response, token: string): void {
   res.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecure(),
     sameSite: 'lax',
     maxAge: SESSION_TTL_MS,
     signed: true,
@@ -229,7 +230,7 @@ export function setSessionCookie(res: Response, token: string): void {
 export function clearSessionCookie(res: Response): void {
   res.clearCookie(SESSION_COOKIE, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecure(),
     sameSite: 'lax',
     signed: true,
   });

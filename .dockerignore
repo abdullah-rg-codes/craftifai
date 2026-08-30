@@ -1,0 +1,11 @@
+node_modules
+.git
+.github
+.local-infra
+.volumes
+backups
+coverage
+.env
+.cursor
+.pnpm-store
+*.log
