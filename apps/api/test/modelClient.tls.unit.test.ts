@@ -1,16 +1,58 @@
 import https from 'node:https';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Secret } from '@craftifai/shared';
 import { createLogger } from '../src/logger.js';
 import { callChatModel, ModelCallError, setExtraCaBundle } from '../src/services/modelClient.js';
 
-const dir = path.dirname(fileURLToPath(import.meta.url));
-const cert = readFileSync(path.join(dir, 'fixtures/tls-cert.pem'));
-const key = readFileSync(path.join(dir, 'fixtures/tls-key.pem'));
 const allowLoopback = { allowedPrivateCidrs: ['127.0.0.0/8'] };
+
+function opensslBin(): string {
+  if (process.platform === 'win32') {
+    const git = 'C:\\Program Files\\Git\\usr\\bin\\openssl.exe';
+    if (existsSync(git)) {
+      return git;
+    }
+  }
+  return 'openssl';
+}
+
+function generateSelfSigned(): { cert: Buffer; key: Buffer } {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'craftifai-tls-'));
+  const certPath = path.join(dir, 'cert.pem');
+  const keyPath = path.join(dir, 'key.pem');
+  try {
+    execFileSync(
+      opensslBin(),
+      [
+        'req',
+        '-x509',
+        '-newkey',
+        'rsa:2048',
+        '-keyout',
+        keyPath,
+        '-out',
+        certPath,
+        '-days',
+        '1',
+        '-nodes',
+        '-subj',
+        '/CN=127.0.0.1',
+        '-addext',
+        'subjectAltName=IP:127.0.0.1',
+      ],
+      { stdio: 'pipe' },
+    );
+    return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const { cert, key } = generateSelfSigned();
 
 function listenHttps(): Promise<{ port: number; close: () => Promise<void> }> {
   const server = https.createServer({ cert, key }, (_req, res) => {

@@ -1,0 +1,12 @@
+# Scan uses the default rules. This allowlist exists because commit 1dbd08e
+# added a throwaway self-signed key for the mounted-CA unit test; that file is
+# gone and the test now generates a key at runtime. Gitleaks still sees the
+# deletion patch on this follow-up commit.
+title = "gitleaks"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Removed self-signed TLS fixture; not a production credential"
+paths = ['''apps/api/test/fixtures/tls-key\.pem''']

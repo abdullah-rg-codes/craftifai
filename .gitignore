@@ -14,7 +14,6 @@ build/
 *.pem
 *.key
 *.secret
-!apps/api/test/fixtures/*.pem
 
 # Logs
 logs/
