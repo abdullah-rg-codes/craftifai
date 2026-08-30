@@ -119,6 +119,24 @@ export async function login(
   return getCookies(response);
 }
 
+export async function seedCredits(
+  adminPool: DatabasePool,
+  orgId: string,
+  credits: number,
+): Promise<void> {
+  await withSystemTransaction(adminPool, async (ctx) => {
+    const dal = createSystemDal(ctx);
+    await dal.creditAccounts.getOrCreate(orgId);
+    await dal.creditAccounts.addAvailable(orgId, credits);
+    await dal.creditLedger.create({
+      orgId,
+      kind: 'purchase',
+      deltaAvailable: credits,
+      deltaReserved: 0,
+    });
+  });
+}
+
 export async function truncateTables(adminPool: DatabasePool, redis: Redis): Promise<void> {
   await withSystemTransaction(adminPool, async (ctx) => {
     await ctx.query(`
