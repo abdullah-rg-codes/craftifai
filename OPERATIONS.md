@@ -35,11 +35,13 @@ Scrape `GET /api/metrics` through the load balancer or per replica.
 | `craftifai_reconciliation_runs_total`                 | Sweeper acquired lock and ran                          |
 | `craftifai_reconciliation_lock_miss_total`            | Another replica holds lock                             |
 | `craftifai_reconciliation_expired_reservations_total` | Expired reservations processed                         |
+| `craftifai_reconciliation_failures_total`             | Sweeper threw before completing                        |
 
 **Alert candidates (production):**
 
 - `rate(craftifai_http_requests_total{status=~"5.."})` > threshold
 - `craftifai_reconciliation_lock_miss_total` high is normal; **zero** `reconciliation_runs_total` for >2 min is not
+- `increase(craftifai_reconciliation_failures_total[5m])` > 0
 - Postgres `numbackends` near max
 
 ---
@@ -55,6 +57,8 @@ Copy `.env.example` → `.env`. Required secrets (Compose fails fast if missing)
 Generate: `openssl rand -base64 32` for 32-byte keys.
 
 `COOKIE_SECURE=false` for plain HTTP on-prem; set `true` only when TLS terminates in front of nginx.
+
+`API_REQUEST_TIMEOUT_MS` (default 180000) is the HTTP server request ceiling. It is independent of per-org `timeout_ms` (max 120s) and must stay ≥ 130000 so a legal model call can complete.
 
 Full detail: `deploy/README.md`.
 

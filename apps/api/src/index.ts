@@ -3,10 +3,10 @@ import type { Application } from 'express';
 import { createPool } from '@craftifai/db';
 import { createLogger } from './logger.js';
 import { buildApp } from './app.js';
-import { env, loadModelCaBundle, validateRuntimeConfig } from './env.js';
+import { env, loadModelCaBundle, validateRuntimeConfig, apiRequestTimeoutMs } from './env.js';
 import { createRedis } from './redis.js';
 import { inflightCount } from './inflight.js';
-import { observeSweep } from './metrics.js';
+import { observeSweep, observeSweepFailure } from './metrics.js';
 import { setExtraCaBundle } from './services/modelClient.js';
 import { runReconciliationSweep } from './services/sweeper.js';
 
@@ -28,9 +28,12 @@ const pool = createPool();
 const redis = createRedis();
 const app: Application = buildApp(logger, pool, redis);
 
+const requestTimeoutMs = apiRequestTimeoutMs();
 const server = app.listen(env.port, () => {
-  logger.info({ port: env.port }, 'API listening');
+  logger.info({ port: env.port, requestTimeoutMs }, 'API listening');
 });
+server.requestTimeout = requestTimeoutMs;
+server.headersTimeout = Math.min(60_000, requestTimeoutMs);
 
 const sweepTimer = setInterval(() => {
   void runReconciliationSweep(pool, logger)
@@ -38,6 +41,7 @@ const sweepTimer = setInterval(() => {
       observeSweep(result);
     })
     .catch((error: unknown) => {
+      observeSweepFailure();
       logger.error(
         { error: error instanceof Error ? error.message : String(error) },
         'reconciliation sweep failed',

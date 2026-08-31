@@ -79,6 +79,10 @@ export function observeSweep(input: { acquiredLock: boolean; expiredReservations
   }
 }
 
+export function observeSweepFailure(): void {
+  inc(counters, counterKey('craftifai_reconciliation_failures_total', { replica }));
+}
+
 function observeHistogram(name: string, labels: Record<string, string>, value: number): void {
   const key = counterKey(name, labels);
   inc(histogramCounts, key);
@@ -132,6 +136,12 @@ export function renderMetrics(): string {
     lines,
     'craftifai_reconciliation_expired_reservations_total',
     'Reservations expired by the sweeper',
+    counters,
+  );
+  appendCounter(
+    lines,
+    'craftifai_reconciliation_failures_total',
+    'Sweeper runs that threw before completing',
     counters,
   );
   return `${lines.join('\n')}\n`;
