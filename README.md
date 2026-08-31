@@ -23,7 +23,7 @@ than a larger happy-path-only build.
 
 ```bash
 # 1. Clone and install
-git clone <repo-url> craftifai && cd craftifai
+git clone https://github.com/abdullah-rg-codes/craftifai.git craftifai && cd craftifai
 pnpm install
 
 # 2. Environment — copy and fill every secret
