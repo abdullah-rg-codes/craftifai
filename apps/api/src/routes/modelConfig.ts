@@ -4,7 +4,7 @@ import { createOrgDal, withTransaction, type DatabasePool } from '@craftifai/db'
 import { modelUnavailable, notFound, validation } from '@craftifai/shared';
 import type { Logger } from '../logger.js';
 import type { AuthContext } from '../auth.js';
-import { requireAdmin, requireAuth } from '../auth.js';
+import { requireAdmin } from '../auth.js';
 import { asyncHandler } from '../errors.js';
 import { decryptCredential, encryptCredential } from '../services/crypto.js';
 import { callChatModel, ModelCallError } from '../services/modelClient.js';
@@ -30,7 +30,10 @@ export function buildModelConfigRouter(
   router.get(
     '/',
     asyncHandler(async (req, res) => {
-      const auth = requireAuth(getAuth(req));
+      const auth = getAuth(req);
+      if (!auth) {
+        throw notFound('Organization not found');
+      }
       requireAdmin(auth);
       const config = await withTransaction(pool, auth.orgId, async (ctx) => {
         return createOrgDal(ctx).modelConfigurations.findByOrgId(auth.orgId);
@@ -45,7 +48,10 @@ export function buildModelConfigRouter(
   router.put(
     '/',
     asyncHandler(async (req, res) => {
-      const auth = requireAuth(getAuth(req));
+      const auth = getAuth(req);
+      if (!auth) {
+        throw notFound('Organization not found');
+      }
       requireAdmin(auth);
       const body = upsertSchema.parse(req.body);
 
@@ -110,7 +116,10 @@ export function buildModelConfigRouter(
   router.post(
     '/test',
     asyncHandler(async (req, res) => {
-      const auth = requireAuth(getAuth(req));
+      const auth = getAuth(req);
+      if (!auth) {
+        throw notFound('Organization not found');
+      }
       requireAdmin(auth);
       const config = await withTransaction(pool, auth.orgId, async (ctx) => {
         return createOrgDal(ctx).modelConfigurations.findByOrgId(auth.orgId);

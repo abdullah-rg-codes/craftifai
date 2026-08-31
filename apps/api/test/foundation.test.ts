@@ -308,6 +308,37 @@ describeIf('Phase 1 foundation', () => {
       .send({ status: 'suspended' })
       .expect(404);
     await app.delete(`/members/${membershipB.id}`).set('Cookie', cookie).expect(404);
+
+    const cookieA = await login(app, userA.email, userA.password);
+    const missingOrg = { 'X-Org-Id': orgB.id };
+
+    const ledger = await app.get('/credits/ledger').set('Cookie', cookieA).expect(200);
+    expect(ledger.body.entries.map((entry: { id: string }) => entry.id)).not.toContain(
+      resources.ledgerId,
+    );
+    const purchases = await app.get('/purchases').set('Cookie', cookieA).expect(200);
+    expect(purchases.body.purchases.map((row: { id: string }) => row.id)).not.toContain(
+      resources.purchaseId,
+    );
+    const reservations = await app.get('/credits/reservations').set('Cookie', cookieA).expect(200);
+    expect(reservations.body.reservations.map((row: { id: string }) => row.id)).not.toContain(
+      resources.reservationId,
+    );
+    const audit = await app.get('/audit-events').set('Cookie', cookieA).expect(200);
+    expect(audit.body.events.map((event: { id: string }) => event.id)).not.toContain(
+      resources.auditId,
+    );
+    const account = await app.get('/credits/account').set('Cookie', cookieA).expect(200);
+    expect(account.body.org_id).toBe(orgA.id);
+    const config = await app.get('/model-config').set('Cookie', cookieA).expect(404);
+    expect(JSON.stringify(config.body)).not.toContain('http://model.internal');
+
+    await app.get('/credits/ledger').set('Cookie', cookieA).set(missingOrg).expect(404);
+    await app.get('/credits/account').set('Cookie', cookieA).set(missingOrg).expect(404);
+    await app.get('/credits/reservations').set('Cookie', cookieA).set(missingOrg).expect(404);
+    await app.get('/purchases').set('Cookie', cookieA).set(missingOrg).expect(404);
+    await app.get('/audit-events').set('Cookie', cookieA).set(missingOrg).expect(404);
+    await app.get('/model-config').set('Cookie', cookieA).set(missingOrg).expect(404);
   });
 
   it('registration atomically creates an organization, active admin, and zero balance', async () => {
@@ -578,6 +609,28 @@ describeIf('Phase 1 foundation', () => {
       .expect(403);
     await app.delete(`/members/${membershipId}`).set('Cookie', cookie).expect(403);
     await app.get('/audit-events').set('Cookie', cookie).expect(403);
+
+    await app.get('/credits/account').set('Cookie', cookie).expect(403);
+    await app.get('/credits/ledger').set('Cookie', cookie).expect(403);
+    await app.get('/credits/reservations').set('Cookie', cookie).expect(403);
+    await app.get('/purchases').set('Cookie', cookie).expect(403);
+    await app
+      .post('/purchases')
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', 'member-purchase')
+      .send({ credits: 10 })
+      .expect(403);
+    await app.get('/model-config').set('Cookie', cookie).expect(403);
+    await app
+      .put('/model-config')
+      .set('Cookie', cookie)
+      .send({
+        endpoint_url: 'http://127.0.0.1/v1/chat/completions',
+        model_name: 'blocked',
+        credential: 'not-a-real-secret',
+      })
+      .expect(403);
+    await app.post('/model-config/test').set('Cookie', cookie).expect(403);
   });
 
   it('lists members with a stable opaque composite cursor and bounded page size', async () => {
