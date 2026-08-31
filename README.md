@@ -67,7 +67,10 @@ BOOTSTRAP_EMAIL=admin@example.com BOOTSTRAP_PASSWORD='choose-a-long-passphrase' 
 ### Configure mock model (admin UI)
 
 1. Sign in → **Model** page.
-2. Endpoint: `http://mock-model:8081/v1/chat/completions` (from inside Compose network).
+2. Endpoint — pick the one that matches how you started the stack:
+   - **Compose** (`http://localhost/`): `http://mock-model:8081/v1/chat/completions`  
+     (`mock-model` is a Compose DNS name; it does not resolve on the host.)
+   - **Local Vite** (`pnpm dev`, `http://localhost:5173`): `http://127.0.0.1:8081/v1/chat/completions`
 3. Model name: `mock-gpt`.
 4. Credential: same value as `MOCK_MODEL_API_KEY` in `.env`.
 5. **Test connection** → should succeed.
@@ -131,7 +134,8 @@ console.log(response.status, await response.json());
 "
 ```
 
-4. **Model** → save config → test connection.
+4. **Model** → save config → test connection. Use the Compose or Vite endpoint from
+   **Configure mock model** above — `mock-model` only works inside Compose.
 5. **Playground** (member or admin) → send inference with auto idempotency key.
 6. **Members** → invite a user → copy token → accept at `/invite?token=...` in another browser.
 7. **Audit** → see membership and billing events.
