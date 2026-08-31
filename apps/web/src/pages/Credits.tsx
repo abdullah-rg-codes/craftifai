@@ -73,8 +73,8 @@ export function CreditsPage() {
       <h1>Credits</h1>
       <p>
         Starting a purchase does not change the balance. Credits are applied only when the mock
-        billing service delivers a signed webhook to <code>POST /billing/webhook</code>. See the
-        README for the deliver command.
+        billing service delivers a signed webhook to <code>POST /billing/webhook</code>. Copy the
+        purchase id from the table below; the README has the deliver command.
       </p>
       <form className="row-form" onSubmit={(event) => void buy(event)}>
         <label>
@@ -108,6 +108,7 @@ export function CreditsPage() {
         <table>
           <thead>
             <tr>
+              <th>Id</th>
               <th>Credits</th>
               <th>Status</th>
               <th>Created</th>
@@ -116,6 +117,9 @@ export function CreditsPage() {
           <tbody>
             {purchases.map((purchase) => (
               <tr key={purchase.id}>
+                <td>
+                  <code>{purchase.id}</code>
+                </td>
                 <td>{purchase.credits}</td>
                 <td>{purchase.status}</td>
                 <td>{new Date(purchase.created_at).toLocaleString()}</td>

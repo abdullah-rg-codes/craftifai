@@ -81,11 +81,36 @@ BOOTSTRAP_EMAIL=admin@example.com BOOTSTRAP_PASSWORD='choose-a-long-passphrase' 
 
 1. **Register** at `/register` (or bootstrap above).
 2. **Credits** → start a purchase. Status stays `pending`; the balance does **not** increase yet.
-3. Deliver a **signed** mock-billing webhook (the only credit path). Copy the purchase id
-   from the Credits page. `CREDITS` must match the amount you started. Use **PowerShell**
-   in Cursor on Windows — the bash snippet below will not run there.
+3. Deliver a **signed** mock-billing webhook (the only credit path). Copy the **Id** from
+   the Purchases table. `CREDITS` must match the amount you started.
 
-Local Vite (`pnpm dev`): `BASE_URL=http://127.0.0.1:3000`. Compose: `http://127.0.0.1/api`.
+**Compose** (`http://localhost/`): use bash. Load `WEBHOOK_SECRET` from `.env` first — it is
+not in the shell until you export it.
+
+```bash
+export WEBHOOK_SECRET="$(grep -E '^WEBHOOK_SECRET=' .env | cut -d= -f2- | tr -d '\r')"
+PURCHASE_ID=<uuid> CREDITS=50 BASE_URL=http://127.0.0.1/api WEBHOOK_SECRET="$WEBHOOK_SECRET" \
+  node --input-type=module -e "
+import { createHmac } from 'node:crypto';
+const purchase_id = process.env.PURCHASE_ID;
+const credits = Number(process.env.CREDITS ?? '50');
+const secret = process.env.WEBHOOK_SECRET;
+const base = process.env.BASE_URL ?? 'http://127.0.0.1/api';
+if (!purchase_id || !secret) throw new Error('PURCHASE_ID and WEBHOOK_SECRET are required');
+const timestamp = Math.floor(Date.now() / 1000);
+const body = JSON.stringify({ purchase_id, provider_event_id: 'evt_' + timestamp, credits, timestamp });
+const signature = 't=' + timestamp + ',v1=' + createHmac('sha256', secret).update(timestamp + '.' + body).digest('hex');
+const response = await fetch(base + '/billing/webhook', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', 'x-webhook-signature': signature },
+  body,
+});
+console.log(response.status, await response.json());
+"
+```
+
+**Windows / Cursor PowerShell** with local Vite (`http://localhost:5173`): do not paste the
+bash snippet. `BASE_URL` is `http://127.0.0.1:3000`.
 
 ```powershell
 $env:PURCHASE_ID = "<uuid>"
@@ -110,28 +135,6 @@ const response = await fetch(base + '/billing/webhook', {
 });
 console.log(response.status, await response.json());
 "@
-```
-
-```bash
-# macOS / Linux / Git Bash. Compose origin is http://127.0.0.1/api
-PURCHASE_ID=<uuid> CREDITS=50 BASE_URL=http://127.0.0.1/api WEBHOOK_SECRET="$WEBHOOK_SECRET" \
-  node --input-type=module -e "
-import { createHmac } from 'node:crypto';
-const purchase_id = process.env.PURCHASE_ID;
-const credits = Number(process.env.CREDITS ?? '50');
-const secret = process.env.WEBHOOK_SECRET;
-const base = process.env.BASE_URL ?? 'http://127.0.0.1/api';
-if (!purchase_id || !secret) throw new Error('PURCHASE_ID and WEBHOOK_SECRET are required');
-const timestamp = Math.floor(Date.now() / 1000);
-const body = JSON.stringify({ purchase_id, provider_event_id: 'evt_' + timestamp, credits, timestamp });
-const signature = 't=' + timestamp + ',v1=' + createHmac('sha256', secret).update(timestamp + '.' + body).digest('hex');
-const response = await fetch(base + '/billing/webhook', {
-  method: 'POST',
-  headers: { 'content-type': 'application/json', 'x-webhook-signature': signature },
-  body,
-});
-console.log(response.status, await response.json());
-"
 ```
 
 4. **Model** → save config → test connection. Use the Compose or Vite endpoint from
