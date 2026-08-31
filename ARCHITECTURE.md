@@ -210,14 +210,14 @@ If inference volume later needs smoothing, the honest next step is a **per-org a
 
 ### Failure domains
 
-| Domain          | What dies                          | What does not                                       |
-| --------------- | ---------------------------------- | --------------------------------------------------- |
-| One API replica | In-flight requests on that process | Credits (PG); sibling replica; sweeper on the other |
-| Redis           | Fast session cache, rate limits    | Auth (PG), credits, admin/billing                   |
-| PostgreSQL      | Entire control plane (`/ready` 503) | Nothing financial proceeds                         |
-| nginx / LB      | Both replicas unreachable          | Data on disk                                        |
-| Customer model  | Inference only                     | Members, purchases, webhook, `/ready`               |
-| One hot org     | That org's reserve p95             | Other orgs' row locks                               |
+| Domain          | What dies                           | What does not                                       |
+| --------------- | ----------------------------------- | --------------------------------------------------- |
+| One API replica | In-flight requests on that process  | Credits (PG); sibling replica; sweeper on the other |
+| Redis           | Fast session cache, rate limits     | Auth (PG), credits, admin/billing                   |
+| PostgreSQL      | Entire control plane (`/ready` 503) | Nothing financial proceeds                          |
+| nginx / LB      | Both replicas unreachable           | Data on disk                                        |
+| Customer model  | Inference only                      | Members, purchases, webhook, `/ready`               |
+| One hot org     | That org's reserve p95              | Other orgs' row locks                               |
 
 Backup targets (see `OPERATIONS.md`): **RPO** = last `backup.sh` dump for on-prem (operator cadence; daily is the intended floor). **RTO** = restore script + replica restart — minutes on the eval-sized dump, then grows with dump size (~minutes per GB). SaaS HA failover (sync standby) is a **seconds** RPO and a **minutes** RTO if the old primary is fenced; that is not in the Compose package.
 

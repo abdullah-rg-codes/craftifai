@@ -310,7 +310,6 @@ describeIf('Phase 1 foundation', () => {
     await app.delete(`/members/${membershipB.id}`).set('Cookie', cookie).expect(404);
 
     const cookieA = await login(app, userA.email, userA.password);
-    const missingOrg = { 'X-Org-Id': orgB.id };
 
     const ledger = await app.get('/credits/ledger').set('Cookie', cookieA).expect(200);
     expect(ledger.body.entries.map((entry: { id: string }) => entry.id)).not.toContain(
@@ -333,12 +332,16 @@ describeIf('Phase 1 foundation', () => {
     const config = await app.get('/model-config').set('Cookie', cookieA).expect(404);
     expect(JSON.stringify(config.body)).not.toContain('http://model.internal');
 
-    await app.get('/credits/ledger').set('Cookie', cookieA).set(missingOrg).expect(404);
-    await app.get('/credits/account').set('Cookie', cookieA).set(missingOrg).expect(404);
-    await app.get('/credits/reservations').set('Cookie', cookieA).set(missingOrg).expect(404);
-    await app.get('/purchases').set('Cookie', cookieA).set(missingOrg).expect(404);
-    await app.get('/audit-events').set('Cookie', cookieA).set(missingOrg).expect(404);
-    await app.get('/model-config').set('Cookie', cookieA).set(missingOrg).expect(404);
+    await app.get('/credits/ledger').set('Cookie', cookieA).set('X-Org-Id', orgB.id).expect(404);
+    await app.get('/credits/account').set('Cookie', cookieA).set('X-Org-Id', orgB.id).expect(404);
+    await app
+      .get('/credits/reservations')
+      .set('Cookie', cookieA)
+      .set('X-Org-Id', orgB.id)
+      .expect(404);
+    await app.get('/purchases').set('Cookie', cookieA).set('X-Org-Id', orgB.id).expect(404);
+    await app.get('/audit-events').set('Cookie', cookieA).set('X-Org-Id', orgB.id).expect(404);
+    await app.get('/model-config').set('Cookie', cookieA).set('X-Org-Id', orgB.id).expect(404);
   });
 
   it('registration atomically creates an organization, active admin, and zero balance', async () => {
