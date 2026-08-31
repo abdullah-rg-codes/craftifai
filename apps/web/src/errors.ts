@@ -26,7 +26,7 @@ export function playgroundErrorCopy(
     if (viewerRole === 'administrator') {
       return {
         title: 'Not enough credits',
-        body: `${counts.trim()} Buy more credits on the Credits page. The balance increases after mock billing confirms the purchase.`,
+        body: `${counts.trim()} Buy more credits on the Credits page. The balance increases after the signed billing webhook arrives.`,
       };
     }
     return {

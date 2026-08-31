@@ -324,22 +324,6 @@ paths:
         '201':
           description: Pending purchase created
 
-  /purchases/{purchaseId}/confirm-mock:
-    post:
-      tags: [purchases]
-      security: [{ cookieAuth: [] }]
-      summary: Demo helper — apply credits without webhook signature
-      description: Development/demo only. Production path is POST /billing/webhook.
-      parameters:
-        - name: purchaseId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-        - $ref: '#/components/parameters/idempotencyKey'
-      responses:
-        '200':
-          description: Applied or already completed
-
   /billing/webhook:
     post:
       tags: [billing]

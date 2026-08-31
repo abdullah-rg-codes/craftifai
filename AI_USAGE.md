@@ -119,6 +119,23 @@ webhook purchase test.
 
 ---
 
+## Example 5: Unsigned purchase confirm (demo helper)
+
+**What AI proposed:** `POST /purchases/:id/confirm-mock` so the Credits UI could apply
+credits without assembling an HMAC — framed as “same path as the webhook.”
+
+**Why it was wrong:** Assignment §4.2: the balance must only increase after the mock
+billing service sends a **valid signed webhook**. An admin cookie was enough to mint
+credits; `WEBHOOK_SECRET` was unused on that path.
+
+**How detected:** Hostile requirement audit against the PDF, not against the OpenAPI
+summary that called it a demo helper.
+
+**What replaced it:** Route and UI button removed. Demo delivers `POST /billing/webhook`
+with `X-Webhook-Signature`. Test asserts the old path 404s and the balance stays 0.
+
+---
+
 ## Supervision model
 
 AI accelerated scaffolding and boilerplate. **Invariants were decided in the design brief

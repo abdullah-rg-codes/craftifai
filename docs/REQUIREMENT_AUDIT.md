@@ -157,7 +157,6 @@ Implemented: `load/harness.ts`, `load/REPORT.md`, CI `compose-load` job.
 
 - Streaming inference (bonus only).
 - CSRF: `SameSite=Lax` without custom mutation header (documented in SECURITY.md).
-- `POST /purchases/:id/confirm-mock` — demo helper; production path is signed webhook.
 
 ---
 

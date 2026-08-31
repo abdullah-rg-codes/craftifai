@@ -77,11 +77,35 @@ BOOTSTRAP_EMAIL=admin@example.com BOOTSTRAP_PASSWORD='choose-a-long-passphrase' 
 ## Demo walkthrough
 
 1. **Register** at `/register` (or bootstrap above).
-2. **Credits** → start a purchase → **Confirm via mock billing** (applies credits).
-3. **Model** → save config → test connection.
-4. **Playground** (member or admin) → send inference with auto idempotency key.
-5. **Members** → invite a user → copy token → accept at `/invite?token=...` in another browser.
-6. **Audit** → see membership and billing events.
+2. **Credits** → start a purchase. Status stays `pending`; the balance does **not** increase yet.
+3. Deliver a **signed** mock-billing webhook (the only credit path). Copy the purchase id from the Credits page, then:
+
+```bash
+# WEBHOOK_SECRET must match the API. BASE_URL is the API origin (Compose: http://127.0.0.1/api).
+PURCHASE_ID=<uuid> CREDITS=50 BASE_URL=http://127.0.0.1/api WEBHOOK_SECRET="$WEBHOOK_SECRET" \
+  node --input-type=module -e "
+import { createHmac } from 'node:crypto';
+const purchase_id = process.env.PURCHASE_ID;
+const credits = Number(process.env.CREDITS ?? '50');
+const secret = process.env.WEBHOOK_SECRET;
+const base = process.env.BASE_URL ?? 'http://127.0.0.1/api';
+if (!purchase_id || !secret) throw new Error('PURCHASE_ID and WEBHOOK_SECRET are required');
+const timestamp = Math.floor(Date.now() / 1000);
+const body = JSON.stringify({ purchase_id, provider_event_id: 'evt_' + timestamp, credits, timestamp });
+const signature = 't=' + timestamp + ',v1=' + createHmac('sha256', secret).update(timestamp + '.' + body).digest('hex');
+const response = await fetch(base + '/billing/webhook', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', 'x-webhook-signature': signature },
+  body,
+});
+console.log(response.status, await response.json());
+"
+```
+
+4. **Model** → save config → test connection.
+5. **Playground** (member or admin) → send inference with auto idempotency key.
+6. **Members** → invite a user → copy token → accept at `/invite?token=...` in another browser.
+7. **Audit** → see membership and billing events.
 
 ---
 

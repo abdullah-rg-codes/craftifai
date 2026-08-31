@@ -68,26 +68,13 @@ export function CreditsPage() {
     }
   }
 
-  async function confirm(purchase: Purchase) {
-    setActionError(null);
-    try {
-      await api(`/purchases/${purchase.id}/confirm-mock`, {
-        method: 'POST',
-        headers: { 'Idempotency-Key': newIdempotencyKey() },
-        body: JSON.stringify({}),
-      });
-      await load();
-    } catch (err) {
-      setActionError(err);
-    }
-  }
-
   return (
     <section>
       <h1>Credits</h1>
       <p>
-        Starting a purchase does not change the balance. Confirm via mock billing to apply the
-        credits, the same path a signed webhook uses.
+        Starting a purchase does not change the balance. Credits are applied only when the mock
+        billing service delivers a signed webhook to <code>POST /billing/webhook</code>. See the
+        README for the deliver command.
       </p>
       <form className="row-form" onSubmit={(event) => void buy(event)}>
         <label>
@@ -115,7 +102,7 @@ export function CreditsPage() {
         empty={{
           when: purchases.length === 0,
           title: 'No purchases yet',
-          body: 'Start a purchase above. The organization balance stays unchanged until mock billing confirms it.',
+          body: 'Start a purchase above. The organization balance stays unchanged until a signed billing webhook arrives.',
         }}
       >
         <table>
@@ -124,7 +111,6 @@ export function CreditsPage() {
               <th>Credits</th>
               <th>Status</th>
               <th>Created</th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -133,13 +119,6 @@ export function CreditsPage() {
                 <td>{purchase.credits}</td>
                 <td>{purchase.status}</td>
                 <td>{new Date(purchase.created_at).toLocaleString()}</td>
-                <td>
-                  {purchase.status === 'pending' ? (
-                    <button type="button" onClick={() => void confirm(purchase)}>
-                      Confirm via mock billing
-                    </button>
-                  ) : null}
-                </td>
               </tr>
             ))}
           </tbody>

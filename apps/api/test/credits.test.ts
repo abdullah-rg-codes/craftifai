@@ -336,7 +336,7 @@ describeIf('Phase 2 credit core', () => {
     );
   });
 
-  it('confirms a pending purchase through mock billing without exposing a signature', async () => {
+  it('does not credit the balance through an unsigned purchase confirm path', async () => {
     const admin = await registerAndLogin(app, 'mock-confirm-admin@example.com');
     const purchase = await app
       .post('/purchases')
@@ -345,26 +345,15 @@ describeIf('Phase 2 credit core', () => {
       .send({ credits: 25 })
       .expect(201);
 
-    const confirmed = await app
+    await app
       .post(`/purchases/${purchase.body.purchaseId as string}/confirm-mock`)
       .set('Cookie', admin.cookie)
       .set('Idempotency-Key', 'mock-confirm-apply')
       .send({})
-      .expect(200);
-
-    expect(confirmed.body).toEqual({ applied: true, purchase_id: purchase.body.purchaseId });
-    expect(JSON.stringify(confirmed.body)).not.toMatch(/signature|webhook/i);
-
-    const replay = await app
-      .post(`/purchases/${purchase.body.purchaseId as string}/confirm-mock`)
-      .set('Cookie', admin.cookie)
-      .set('Idempotency-Key', 'mock-confirm-replay')
-      .send({})
-      .expect(200);
-    expect(replay.body.applied).toBe(false);
+      .expect(404);
 
     const account = await app.get('/credits/account').set('Cookie', admin.cookie).expect(200);
-    expect(account.body.available).toBe(25);
+    expect(account.body.available).toBe(0);
   });
 
   it('lists personal reservations for the authenticated user', async () => {
