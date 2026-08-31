@@ -184,6 +184,43 @@ At 300 rps inference, **~26M reservation rows/day** if every request creates one
 
 **Next move:** Monthly RANGE partitions on `created_at` (PKs are UUIDs — partition key not in PK). Archive cold partitions to object storage; retain aggregates for billing disputes.
 
+This slice **does not delete history**. Indexes already match the list APIs: `(org_id, created_at, id)` on members, ledger, reservations, purchases, audit.
+
+**Retention policy (production, not implemented here):** keep ledger + audit **hot for 90 days** (billing disputes, admin review). After that, detach the month partition to cold storage; keep `SUM(delta_*)` per org so the identity `available + reserved = ledger sum` still holds on the live tables. Memberships and current balances are not eligible for that drop.
+
+### Cache, rate limits, and backpressure
+
+Redis is **not** a balance cache. It holds:
+
+| Key                      | TTL    | Invalidation                                    |
+| ------------------------ | ------ | ----------------------------------------------- |
+| Session payload          | ≤ 60 s | Delete + revocation tombstone on suspend/remove |
+| `session_revoked:*`      | 60 s   | Expiry; PG `revoked_at` is source of truth      |
+| `rl:org:*` / `rl:user:*` | 60 s   | Window expiry                                   |
+
+Balance, idempotency, and reservations are always PostgreSQL.
+
+**Backpressure:** per-user (300/min) and per-org (600/min) Redis counters → HTTP 429. There is no in-process queue. When one org saturates `org_credit_accounts`, waiters block in Postgres on that row — other orgs are unaffected. Pool `connectionTimeoutMillis` is 5 s; `API_REQUEST_TIMEOUT_MS` (default 180 s) is the HTTP ceiling. Redis down: session reads fall through to PG; rate-limit check fails closed to 503 rather than unlimited traffic.
+
+### Background work (no durable queue)
+
+There is **no** message queue in this slice. Abandoned inference is a `credit_reservations` row with `expires_at`, not a job payload. The sweeper is a 30 s timer + `pg_try_advisory_lock`; work is the table. A queue would add a second source of truth for money — rejected.
+
+If inference volume later needs smoothing, the honest next step is a **per-org admission lock** (still in PG) or a queue whose consumer still runs the same reserve/settle transactions. The queue must not be allowed to credit or debit.
+
+### Failure domains
+
+| Domain          | What dies                          | What does not                                       |
+| --------------- | ---------------------------------- | --------------------------------------------------- |
+| One API replica | In-flight requests on that process | Credits (PG); sibling replica; sweeper on the other |
+| Redis           | Fast session cache, rate limits    | Auth (PG), credits, admin/billing                   |
+| PostgreSQL      | Entire control plane (`/ready` 503) | Nothing financial proceeds                         |
+| nginx / LB      | Both replicas unreachable          | Data on disk                                        |
+| Customer model  | Inference only                     | Members, purchases, webhook, `/ready`               |
+| One hot org     | That org's reserve p95             | Other orgs' row locks                               |
+
+Backup targets (see `OPERATIONS.md`): **RPO** = last `backup.sh` dump for on-prem (operator cadence; daily is the intended floor). **RTO** = restore script + replica restart — minutes on the eval-sized dump, then grows with dump size (~minutes per GB). SaaS HA failover (sync standby) is a **seconds** RPO and a **minutes** RTO if the old primary is fenced; that is not in the Compose package.
+
 ### When one PostgreSQL stops being enough
 
 **Signal:** sustained `pg_stat_database.blks_hit` collapse, replication lag on read replicas
