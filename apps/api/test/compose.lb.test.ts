@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import { createPool, withSystemTransaction } from '@craftifai/db';
@@ -8,24 +8,79 @@ import { registerAndLogin, seedCredits, createTestApp } from './helpers.js';
 
 const describeIf = testBaseUrl() ? describe : describe.skip;
 
+const HEALTH_SCRIPT =
+  "fetch('http://127.0.0.1:3000/health').then(async(r)=>{process.stdout.write(await r.text());process.exit(r.ok?0:1)}).catch(()=>process.exit(1))";
+
+function composeExec(service: string, script: string): string {
+  return execFileSync('docker', ['compose', 'exec', '-T', service, 'node', '-e', script], {
+    encoding: 'utf8',
+    timeout: 10_000,
+  });
+}
+
+function replicaFromContainer(service: 'api-1' | 'api-2'): string {
+  const body = JSON.parse(composeExec(service, HEALTH_SCRIPT)) as {
+    status: string;
+    replica?: string;
+  };
+  expect(body.status).toBe('ok');
+  expect(body.replica).toBe(service);
+  return body.replica ?? service;
+}
+
+async function replicaThroughProxy(base: string): Promise<string | undefined> {
+  const response = await fetch(`${base}/health`, {
+    headers: { connection: 'close' },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(2_000),
+  });
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as { status: string; replica?: string };
+  expect(body.status).toBe('ok');
+  return body.replica;
+}
+
+function restartApi1UntilHealthy(): void {
+  try {
+    execFileSync('docker', ['compose', 'restart', 'api-1'], { stdio: 'pipe' });
+  } catch {
+    // Local runs without Docker still prove reconciliation via the sweeper function.
+    return;
+  }
+  execFileSync('docker', ['compose', 'up', '-d', '--wait', '--wait-timeout', '60', 'api-1'], {
+    stdio: 'pipe',
+  });
+}
+
 describeIf('compose load balancer', () => {
   it('serves two distinct replica ids through nginx /health', async () => {
     const base = testBaseUrl();
     if (!base) {
       return;
     }
+
+    expect(new Set([replicaFromContainer('api-1'), replicaFromContainer('api-2')])).toEqual(
+      new Set(['api-1', 'api-2']),
+    );
+
     const seen = new Set<string>();
-    const deadline = Date.now() + 5_000;
+    const burst = await Promise.allSettled(
+      Array.from({ length: 8 }, () => replicaThroughProxy(base)),
+    );
+    for (const result of burst) {
+      if (result.status === 'fulfilled' && result.value) {
+        seen.add(result.value);
+      }
+    }
+    const deadline = Date.now() + 8_000;
     while (seen.size < 2 && Date.now() < deadline) {
-      const response = await fetch(`${base}/health`, {
-        headers: { connection: 'close' },
-        cache: 'no-store',
-      });
-      expect(response.status).toBe(200);
-      const body = (await response.json()) as { status: string; replica?: string };
-      expect(body.status).toBe('ok');
-      if (body.replica) {
-        seen.add(body.replica);
+      try {
+        const replica = await replicaThroughProxy(base);
+        if (replica) {
+          seen.add(replica);
+        }
+      } catch {
+        // Hung or failing upstream; retry within the deadline.
       }
     }
     expect(seen.size).toBeGreaterThanOrEqual(2);
@@ -67,11 +122,7 @@ describeIf('compose load balancer', () => {
         );
       });
 
-      try {
-        execSync('docker compose restart api-1', { stdio: 'pipe' });
-      } catch {
-        // Local runs without Docker still prove reconciliation via the sweeper function.
-      }
+      restartApi1UntilHealthy();
 
       const sweepPool = createPool();
       try {
