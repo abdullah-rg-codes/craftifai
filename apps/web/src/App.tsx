@@ -57,6 +57,7 @@ export function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/invite" element={<InvitePage />} />
           <Route element={<PublicOnly />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -64,7 +65,6 @@ export function App() {
           <Route element={<RequireAuth />}>
             <Route element={<Layout />}>
               <Route path="/" element={<HomePage />} />
-              <Route path="/invite" element={<InvitePage />} />
               <Route path="/playground" element={<PlaygroundPage />} />
               <Route path="/me/usage" element={<MyUsagePage />} />
               <Route element={<RequireAdmin />}>

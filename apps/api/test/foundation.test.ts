@@ -748,6 +748,73 @@ describeIf('Phase 1 foundation', () => {
     expect(membership).toBe(accepted.body.membership_id);
   });
 
+  it('joins an invitee with a password and does not create a second organization', async () => {
+    const admin = await registerAndLogin(app, 'join-admin@example.com');
+    const orgCountBefore = await withSystemTransaction(pool, async (ctx) => {
+      const result = await ctx.query<{ n: number }>('SELECT count(*)::int AS n FROM organizations');
+      return result.rows[0]!.n;
+    });
+
+    const invitation = await app
+      .post('/members/invitations')
+      .set('Cookie', admin.cookie)
+      .send({ email: 'join-member@example.com', role: 'member' })
+      .expect(201);
+
+    await app
+      .post('/members/invitations/accept')
+      .send({ token: invitation.body.token })
+      .expect(400);
+
+    const accepted = await app
+      .post('/members/invitations/accept')
+      .send({ token: invitation.body.token, password: 'password123' })
+      .expect(201);
+    expect(accepted.body).toMatchObject({ org_id: admin.orgId, role: 'member' });
+
+    const cookie = getCookies(accepted);
+    const me = await app.get('/auth/me').set('Cookie', cookie).expect(200);
+    expect(me.body).toMatchObject({
+      email: 'join-member@example.com',
+      org_id: admin.orgId,
+      role: 'member',
+    });
+    await app.get('/members').set('Cookie', cookie).expect(403);
+
+    const counts = await withSystemTransaction(pool, async (ctx) => {
+      const orgs = await ctx.query<{ n: number }>('SELECT count(*)::int AS n FROM organizations');
+      const memberships = await ctx.query<{ n: number }>(
+        'SELECT count(*)::int AS n FROM memberships WHERE user_id = $1',
+        [me.body.user_id],
+      );
+      return { orgs: orgs.rows[0]!.n, memberships: memberships.rows[0]!.n };
+    });
+    expect(counts.orgs).toBe(orgCountBefore);
+    expect(counts.memberships).toBe(1);
+  });
+
+  it('does not consume an invitation when that email already has an account', async () => {
+    const admin = await registerAndLogin(app, 'join-existing-admin@example.com');
+    const invitation = await app
+      .post('/members/invitations')
+      .set('Cookie', admin.cookie)
+      .send({ email: 'already-registered@example.com', role: 'member' })
+      .expect(201);
+    const existing = await registerAndLogin(app, 'already-registered@example.com');
+
+    await app
+      .post('/members/invitations/accept')
+      .send({ token: invitation.body.token, password: 'password123' })
+      .expect(409);
+
+    const accepted = await app
+      .post('/members/invitations/accept')
+      .set('Cookie', existing.cookie)
+      .send({ token: invitation.body.token })
+      .expect(201);
+    expect(accepted.body).toMatchObject({ org_id: admin.orgId, role: 'member' });
+  });
+
   it('audit events are written in the same transaction as membership changes', async () => {
     const admin = await registerAndLogin(app, 'audit-admin@example.com');
     const member = await directCreateUser(pool, 'audit-member@example.com');

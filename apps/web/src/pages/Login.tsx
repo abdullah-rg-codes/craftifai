@@ -67,6 +67,8 @@ export function LoginPage() {
       </form>
       <p>
         New here? <Link to="/register">Create an organization</Link>
+        {' · '}
+        <Link to="/invite">Join with an invite token</Link>
       </p>
     </div>
   );

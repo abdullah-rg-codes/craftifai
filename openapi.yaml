@@ -172,8 +172,10 @@ paths:
   /members/invitations/accept:
     post:
       tags: [members]
-      security: [{ cookieAuth: [] }]
       summary: Accept invitation by token
+      description: >
+        Unauthenticated invitees send token and password; a user is created in that
+        organization only (no new organization). Existing accounts send token with a session cookie.
       requestBody:
         required: true
         content:
@@ -183,9 +185,17 @@ paths:
               required: [token]
               properties:
                 token: { type: string, minLength: 32 }
+                password:
+                  type: string
+                  minLength: 8
+                  description: Required when not signed in; ignored when a session cookie is present
       responses:
         '201':
-          description: Membership created
+          description: Membership created; session cookie set for new users
+        '400':
+          description: Password missing for an unauthenticated join
+        '409':
+          description: Email already registered; sign in then accept
 
   /members/{membershipId}/role:
     patch:

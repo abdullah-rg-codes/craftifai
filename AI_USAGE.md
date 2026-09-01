@@ -153,6 +153,21 @@ and poisons host `apps/web/node_modules` before `docker compose build`. Sanity t
 
 ---
 
+## Example 7: Invite required Register, which created a leftover organization
+
+**What was wrong:** `POST /members/invitations/accept` required a session. Register always
+inserts an organization and an administrator membership. The only way to add a member was
+to found a second org, then accept — the invitee looked demoted; they had switched orgs.
+
+**Why it was wrong:** Assignment §4.1 is invite-with-token into **that** organization. A
+throwaway org is not required and confuses the Team demo.
+
+**What replaced it:** Unauthenticated accept with `token` + `password` creates the user and
+membership in the invited org only. `/invite` is public. Register remains the first-admin
+path. Tests assert organization count does not increase on join.
+
+---
+
 ## Supervision model
 
 AI accelerated scaffolding and boilerplate. **Invariants were decided in the design brief

@@ -9,13 +9,15 @@ import {
   createSystemDal,
   type DatabasePool,
 } from '@craftifai/db';
-import { notFound, conflict, AppError } from '@craftifai/shared';
+import { notFound, conflict, AppError, validation, hashPassword } from '@craftifai/shared';
 import type { Logger } from '../logger.js';
 import type { AuthContext } from '../auth.js';
 import {
+  createSession,
   invalidateRevokedUserSessions,
   invalidateUserSessionCache,
   requireAdmin,
+  setSessionCookie,
 } from '../auth.js';
 import { asyncHandler } from '../errors.js';
 import type { DbMembershipWithUser } from '@craftifai/db';
@@ -28,6 +30,7 @@ const inviteSchema = z.object({
 
 const acceptInvitationSchema = z.object({
   token: z.string().min(32),
+  password: z.string().min(8).optional(),
 });
 
 const listQuerySchema = z.object({
@@ -113,11 +116,65 @@ export function buildMembersRouter(
     '/invitations/accept',
     asyncHandler(async (req, res) => {
       const auth = getAuth(req);
-      if (!auth) {
-        throw new AppError('UNAUTHORIZED', 'Authentication required', 401);
-      }
       const input = acceptInvitationSchema.parse(req.body);
       const tokenHash = createHash('sha256').update(input.token).digest('base64url');
+
+      if (!auth) {
+        if (!input.password) {
+          throw validation('Password is required to join with an invitation');
+        }
+        const passwordHash = await hashPassword(input.password);
+        const joined = await withSystemTransaction(pool, async (ctx) => {
+          const dal = createSystemDal(ctx);
+          const pending = await dal.invitations.findByTokenHash(tokenHash);
+          if (
+            !pending ||
+            pending.status !== 'pending' ||
+            new Date(pending.expires_at).getTime() <= Date.now()
+          ) {
+            throw notFound('Invitation not found');
+          }
+          const existing = await dal.users.findByEmail(pending.email);
+          if (existing) {
+            throw conflict(
+              'An account already exists for this email. Sign in, then accept the invitation.',
+            );
+          }
+          const invitation = await dal.invitations.acceptPendingByTokenHash(tokenHash);
+          if (!invitation) {
+            throw notFound('Invitation not found');
+          }
+          const user = await dal.users.create({
+            email: invitation.email,
+            passwordHash,
+            displayName: null,
+          });
+          const created = await dal.memberships.create({
+            orgId: invitation.org_id,
+            userId: user.id,
+            role: invitation.role,
+            status: 'active',
+          });
+          await dal.audit.create({
+            orgId: invitation.org_id,
+            actorUserId: user.id,
+            action: 'invitation.accept',
+            targetType: 'membership',
+            targetId: created.id,
+            metadata: { invitation_id: invitation.id },
+          });
+          return { membership: created, userId: user.id };
+        });
+        const { token } = await createSession(pool, redis, joined.userId);
+        setSessionCookie(res, token);
+        res.status(201).json({
+          membership_id: joined.membership.id,
+          org_id: joined.membership.org_id,
+          role: joined.membership.role,
+        });
+        return;
+      }
+
       const membership = await withSystemTransaction(pool, async (ctx) => {
         const dal = createSystemDal(ctx);
         const user = await dal.users.findById(auth.userId);

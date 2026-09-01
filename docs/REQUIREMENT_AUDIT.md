@@ -38,7 +38,7 @@ Status: **implemented**, **partial**, **missing**, **defer** (out of scope).
 | Backend authorization                  | implemented | Not UI-only; 403 from API                                                           |
 | Cross-tenant ID tampering              | implemented | Org from session; DAL scoped; 404 semantics `foundation.test.ts:127`                |
 | Cursor member listing                  | implemented | Composite cursor `(created_at, id)`                                                 |
-| Invitation token (no email)            | implemented | Token in API response; `/invite` page                                               |
+| Invitation token (no email)            | implemented | Token in API response; public `/invite` join (password, no extra org)       |
 
 ---
 

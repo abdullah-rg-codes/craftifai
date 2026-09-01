@@ -136,8 +136,9 @@ export function MembersPage() {
       </form>
       {inviteToken ? (
         <p className="notice">
-          Invitation created. Give this one-time token to {invitedEmail} so they can accept it:{' '}
-          <code>{inviteToken}</code>
+          Invitation created for {invitedEmail}. In a logged-out browser open <code>/invite</code>,
+          paste the token, and choose a password. Do not use Register — that creates a new
+          organization. Token: <code>{inviteToken}</code>
         </p>
       ) : null}
       {actionError ? (

@@ -40,6 +40,10 @@ export function RegisterPage() {
     <div className="auth-card">
       <h1>Create an organization</h1>
       <p>Registration creates your user, a new organization, and makes you its administrator.</p>
+      <p>
+        Joining someone else&apos;s organization? Use{' '}
+        <Link to="/invite">Join with an invite token</Link> instead.
+      </p>
       <form onSubmit={(event) => void onSubmit(event)}>
         <label>
           Email

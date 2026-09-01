@@ -181,7 +181,9 @@ console.log(response.status, await response.json());
 4. **Model** → save config → test connection. Use the Compose or Vite endpoint from
    **Configure mock model** above — `mock-model` only works inside Compose.
 5. **Playground** (member or admin) → send inference with auto idempotency key.
-6. **Members** → invite a user → copy token → accept at `/invite?token=...` in another browser.
+6. **Members** → invite an unused email as Member → copy the token. In a **logged-out**
+   browser open `/invite`, paste the token, and choose a password. Do **not** Register —
+   Register founds a new organization. The invitee becomes a member of **this** org only.
 7. **Audit** → see membership and billing events.
 
 ---
