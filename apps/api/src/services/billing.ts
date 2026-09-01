@@ -4,6 +4,8 @@ import { webhookInvalid, webhookReplay } from '@craftifai/shared';
 export const WEBHOOK_SIGNATURE_SCHEME = 'v1';
 export const WEBHOOK_MAX_AGE_SECONDS = 300;
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface WebhookPayload {
   purchase_id: string;
   provider_event_id: string;
@@ -91,9 +93,7 @@ export function verifyWebhook(
   }
 
   const purchaseId = (payload as WebhookPayload).purchase_id;
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(purchaseId)
-  ) {
+  if (!UUID_PATTERN.test(purchaseId)) {
     throw webhookInvalid('Malformed webhook payload');
   }
 
