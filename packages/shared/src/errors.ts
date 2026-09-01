@@ -13,6 +13,7 @@ export type AppErrorCode =
   | 'MODEL_UNAVAILABLE'
   | 'MODEL_MALFORMED'
   | 'RATE_LIMITED'
+  | 'SERVICE_UNAVAILABLE'
   | 'INTERNAL';
 
 export class AppError extends Error {
@@ -98,4 +99,8 @@ export function rateLimited(retryAfterSeconds: number): AppError {
   return new AppError('RATE_LIMITED', 'Rate limit exceeded', 429, {
     retryAfterSeconds,
   });
+}
+
+export function serviceUnavailable(message = 'Service unavailable'): AppError {
+  return new AppError('SERVICE_UNAVAILABLE', message, 503);
 }

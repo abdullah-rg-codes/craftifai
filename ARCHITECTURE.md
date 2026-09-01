@@ -141,7 +141,7 @@ Isolation level: **READ COMMITTED** throughout. Stronger isolation is unnecessar
 | Process kill mid-request              | Reservation expires; sweeper refunds                                            |
 | Duplicate idempotency key             | Replay or 409 in-progress                                                       |
 | Duplicate webhook                     | Second insert on PK fails; balance unchanged                                    |
-| Redis unavailable                     | Session cache miss → PG read; rate limit may fail open to 503                   |
+| Redis unavailable                     | Session cache miss → PG read; rate limit fails closed with 503                  |
 | Postgres unavailable                  | `/ready` 503; no partial credit writes                                          |
 | Model down                            | Inference fails; **admin/billing APIs stay up** — model excluded from readiness |
 

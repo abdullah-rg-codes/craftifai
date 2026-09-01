@@ -1,5 +1,5 @@
 import type { Redis } from 'ioredis';
-import { rateLimited } from '@craftifai/shared';
+import { AppError, rateLimited, serviceUnavailable } from '@craftifai/shared';
 
 const WINDOW_SECONDS = 60;
 
@@ -32,12 +32,19 @@ export async function assertWithinRateLimit(
   orgId: string,
   userId: string,
 ): Promise<void> {
-  const org = await hit(redis, `rl:org:${orgId}`, orgLimit());
-  if (!org.allowed) {
-    throw rateLimited(org.retryAfterSeconds);
-  }
-  const user = await hit(redis, `rl:user:${userId}`, userLimit());
-  if (!user.allowed) {
-    throw rateLimited(user.retryAfterSeconds);
+  try {
+    const org = await hit(redis, `rl:org:${orgId}`, orgLimit());
+    if (!org.allowed) {
+      throw rateLimited(org.retryAfterSeconds);
+    }
+    const user = await hit(redis, `rl:user:${userId}`, userLimit());
+    if (!user.allowed) {
+      throw rateLimited(user.retryAfterSeconds);
+    }
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw serviceUnavailable('Rate limiter unavailable');
   }
 }
