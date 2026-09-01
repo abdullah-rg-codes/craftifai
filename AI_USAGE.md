@@ -136,6 +136,23 @@ with `X-Webhook-Signature`. Test asserts the old path 404s and the balance stays
 
 ---
 
+## Example 6: Nginx SPA image skipped tsc under a README `.env`
+
+**What was wrong:** `.dockerignore` listed `node_modules` (root only). After `pnpm install`
+on Windows, `COPY apps/web` overlaid host pnpm links into the Linux build. `.env.example`
+sets `NODE_ENV=production`; Compose Bake forwards that into `pnpm install`, which omits
+`typescript` and `vite` (web devDependencies). CI compose-build did neither, so it stayed green.
+
+**How detected:** Clean clone on Windows 11 Home following README Full stack —
+`Cannot find module '.../apps/web/node_modules/typescript/bin/tsc'`.
+
+**What replaced it:** `**/node_modules` in `.dockerignore`; `ENV NODE_ENV=development` in
+the nginx build stage before `pnpm install`. CI compose-build now sets `NODE_ENV=production`
+and poisons host `apps/web/node_modules` before `docker compose build`. Sanity test
+`nginxDockerBuild.unit.test.ts` guards both files.
+
+---
+
 ## Supervision model
 
 AI accelerated scaffolding and boilerplate. **Invariants were decided in the design brief

@@ -136,6 +136,7 @@ jobs:
   compose-build:
     runs-on: ubuntu-latest
     env:
+      NODE_ENV: production
       POSTGRES_ADMIN_PASSWORD: ci-admin-password-not-real
       POSTGRES_APP_PASSWORD: ci-app-password-not-real
       SESSION_SECRET: ci-session-secret-not-real
@@ -154,11 +155,18 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Poison host web node_modules (Windows clone overlay)
+        run: |
+          rm -rf apps/web/node_modules
+          mkdir -p apps/web/node_modules/typescript/bin
+          printf '%s\n' '#!/usr/bin/env node' "throw new Error('host node_modules leaked into Docker context')" > apps/web/node_modules/typescript/bin/tsc
+          chmod +x apps/web/node_modules/typescript/bin/tsc
       - run: docker compose build
 
   compose-e2e:
     runs-on: ubuntu-latest
     env:
+      NODE_ENV: production
       POSTGRES_ADMIN_USER: craftifai_owner
       POSTGRES_ADMIN_PASSWORD: ci-admin-password-not-real
       POSTGRES_APP_PASSWORD: ci-app-password-not-real
@@ -207,6 +215,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
+      NODE_ENV: production
       POSTGRES_ADMIN_USER: craftifai_owner
       POSTGRES_ADMIN_PASSWORD: ci-admin-password-not-real
       POSTGRES_APP_PASSWORD: ci-app-password-not-real

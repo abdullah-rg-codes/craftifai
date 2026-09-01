@@ -7,6 +7,8 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
 COPY apps/api/package.json apps/api/
 COPY apps/mock-model/package.json apps/mock-model/
+# Compose Bake forwards NODE_ENV=production from .env; that skips tsc/vite.
+ENV NODE_ENV=development
 RUN pnpm install --frozen-lockfile
 COPY tsconfig.json ./
 COPY packages/shared packages/shared
