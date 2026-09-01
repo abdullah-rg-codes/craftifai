@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 11.24.0
 
@@ -65,7 +65,7 @@ jobs:
             --config p/nginx \
             --config p/github-actions
 
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 11.24.0
 
@@ -114,7 +114,7 @@ jobs:
       - name: Derive 32-byte test encryption key
         run: echo "ENCRYPTION_KEY_BASE64=$(printf '%s' '0123456789abcdef0123456789abcdef' | base64 -w 0)" >> "$GITHUB_ENV"
 
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 11.24.0
 
@@ -147,7 +147,7 @@ jobs:
       - name: Derive 32-byte test encryption key
         run: echo "ENCRYPTION_KEY_BASE64=$(printf '%s' '0123456789abcdef0123456789abcdef' | base64 -w 0)" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 11.24.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -185,7 +185,7 @@ jobs:
       - name: Derive 32-byte test encryption key
         run: echo "ENCRYPTION_KEY_BASE64=$(printf '%s' '0123456789abcdef0123456789abcdef' | base64 -w 0)" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 11.24.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -234,7 +234,7 @@ jobs:
       - name: Derive 32-byte test encryption key
         run: echo "ENCRYPTION_KEY_BASE64=$(printf '%s' '0123456789abcdef0123456789abcdef' | base64 -w 0)" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 11.24.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
