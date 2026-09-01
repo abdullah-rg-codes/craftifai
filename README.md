@@ -38,16 +38,16 @@ cp .env.example .env          # macOS / Linux / Git Bash
 
 Leave ports, `REDIS_URL`, and the other defaults. Fill these eight values in `.env`:
 
-| Variable | What to set |
-| -------- | ----------- |
-| `POSTGRES_ADMIN_PASSWORD` | Invent a password (owner / migrations) |
-| `POSTGRES_APP_PASSWORD` | Invent a **different** password (app role) |
-| `DATABASE_ADMIN_URL` | Same admin password in the URL, replacing `CHANGE_ME` |
-| `DATABASE_URL` | Same app password in the URL, replacing `CHANGE_ME` |
-| `SESSION_SECRET` | `openssl rand -base64 32` |
-| `ENCRYPTION_KEY_BASE64` | `openssl rand -base64 32` (must decode to exactly 32 bytes — not a passphrase) |
-| `WEBHOOK_SECRET` | `openssl rand -base64 32` |
-| `MOCK_MODEL_API_KEY` | `openssl rand -base64 32` (paste this same value later on the Model page) |
+| Variable                  | What to set                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------ |
+| `POSTGRES_ADMIN_PASSWORD` | Invent a password (owner / migrations)                                         |
+| `POSTGRES_APP_PASSWORD`   | Invent a **different** password (app role)                                     |
+| `DATABASE_ADMIN_URL`      | Same admin password in the URL, replacing `CHANGE_ME`                          |
+| `DATABASE_URL`            | Same app password in the URL, replacing `CHANGE_ME`                            |
+| `SESSION_SECRET`          | `openssl rand -base64 32`                                                      |
+| `ENCRYPTION_KEY_BASE64`   | `openssl rand -base64 32` (must decode to exactly 32 bytes — not a passphrase) |
+| `WEBHOOK_SECRET`          | `openssl rand -base64 32`                                                      |
+| `MOCK_MODEL_API_KEY`      | `openssl rand -base64 32` (paste this same value later on the Model page)      |
 
 The two URLs must use the passwords you chose, not leftover `CHANGE_ME`. Example:
 
@@ -119,10 +119,10 @@ BOOTSTRAP_EMAIL=admin@example.com BOOTSTRAP_PASSWORD='choose-a-long-passphrase' 
 The two listings below are the **same webhook**. `WEBHOOK_SECRET` must be loaded from
 `.env` (it is not in the shell until you set it). `BASE_URL` must match how you started:
 
-| How you started | Open in the browser | `BASE_URL` |
-| --------------- | ------------------- | ---------- |
-| Full stack Compose | http://localhost/ | `http://127.0.0.1/api` |
-| `pnpm dev` (Vite) | http://localhost:5173 | `http://127.0.0.1:3000` |
+| How you started    | Open in the browser   | `BASE_URL`              |
+| ------------------ | --------------------- | ----------------------- |
+| Full stack Compose | http://localhost/     | `http://127.0.0.1/api`  |
+| `pnpm dev` (Vite)  | http://localhost:5173 | `http://127.0.0.1:3000` |
 
 **Linux / macOS / Git Bash** (cmd.exe cannot run this). Compose URL shown; for Vite change
 `BASE_URL` to `http://127.0.0.1:3000`.
