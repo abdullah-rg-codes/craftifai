@@ -30,14 +30,37 @@ Fill **`.env` first**. Host commands (`pnpm db:migrate`, `pnpm dev`) read that f
 git clone https://github.com/abdullah-rg-codes/craftifai.git craftifai && cd craftifai
 pnpm install
 
-# 2. Environment — copy once, then fill every secret (do not overwrite a filled .env)
+# 2. Environment — copy once (do not overwrite a filled .env)
 cp .env.example .env          # macOS / Linux / Git Bash
 # Windows cmd:  copy .env.example .env
 # PowerShell:   Copy-Item .env.example .env
-# Set at minimum: POSTGRES_* passwords, SESSION_SECRET, WEBHOOK_SECRET,
-# ENCRYPTION_KEY_BASE64 (openssl rand -base64 32), MOCK_MODEL_API_KEY
-# Also set DATABASE_URL and DATABASE_ADMIN_URL to match those passwords (see .env.example).
+```
 
+Leave ports, `REDIS_URL`, and the other defaults. Fill these eight values in `.env`:
+
+| Variable | What to set |
+| -------- | ----------- |
+| `POSTGRES_ADMIN_PASSWORD` | Invent a password (owner / migrations) |
+| `POSTGRES_APP_PASSWORD` | Invent a **different** password (app role) |
+| `DATABASE_ADMIN_URL` | Same admin password in the URL, replacing `CHANGE_ME` |
+| `DATABASE_URL` | Same app password in the URL, replacing `CHANGE_ME` |
+| `SESSION_SECRET` | `openssl rand -base64 32` |
+| `ENCRYPTION_KEY_BASE64` | `openssl rand -base64 32` (must decode to exactly 32 bytes — not a passphrase) |
+| `WEBHOOK_SECRET` | `openssl rand -base64 32` |
+| `MOCK_MODEL_API_KEY` | `openssl rand -base64 32` (paste this same value later on the Model page) |
+
+The two URLs must use the passwords you chose, not leftover `CHANGE_ME`. Example:
+
+```
+POSTGRES_ADMIN_PASSWORD=adminPass1
+POSTGRES_APP_PASSWORD=appPass2
+DATABASE_ADMIN_URL=postgres://craftifai_owner:adminPass1@localhost:5432/craftifai?sslmode=disable
+DATABASE_URL=postgres://craftifai_app:appPass2@localhost:5432/craftifai?sslmode=disable
+```
+
+Avoid `@`, `:`, `/`, `#`, and `%` in those passwords or the URLs break. On Windows without `openssl`, Git Bash usually provides it; otherwise any 32-byte value base64-encoded is valid for `ENCRYPTION_KEY_BASE64`.
+
+```bash
 # 3. Backing services (fails if Docker Desktop is not running)
 docker compose up -d postgres redis mock-model
 pnpm db:migrate
