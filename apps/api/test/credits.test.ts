@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeAll, beforeEach, afterAll } from 'vitest';
 import { setTimeout as delay } from 'node:timers/promises';
+import { createHash } from 'node:crypto';
 import { createSystemDal, withSystemTransaction, type DatabasePool } from '@craftifai/db';
 import {
   createTestApp,
@@ -558,6 +559,30 @@ describeIf('Phase 2 credit core', () => {
       .send({ max_total_tokens: 1000 })
       .expect(409);
     expect(replay.body.error.code).toBe('IDEMPOTENCY_CONFLICT');
+  });
+
+  it('returns in-progress when a duplicate key is still pending', async () => {
+    const admin = await registerAndLogin(app, 'in-progress-admin@example.com');
+    const rawBody = JSON.stringify({ max_total_tokens: 1000 });
+    await withSystemTransaction(pool, async (ctx) => {
+      const dal = createSystemDal(ctx);
+      await dal.idempotencyKeys.claim({
+        orgId: admin.orgId,
+        endpoint: '/inference',
+        key: 'held-in-progress-key',
+        fingerprint: createHash('sha256').update(rawBody).digest(),
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+    });
+
+    const response = await app
+      .post('/inference')
+      .set('Cookie', admin.cookie)
+      .set('Idempotency-Key', 'held-in-progress-key')
+      .set('Content-Type', 'application/json')
+      .send(rawBody)
+      .expect(409);
+    expect(response.body.error.code).toBe('IDEMPOTENCY_IN_PROGRESS');
   });
 
   it('concurrent inference requests exhaust balance exactly without going negative', async () => {
