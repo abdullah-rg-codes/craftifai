@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { databaseAdminUrl } from './env.js';
+import { loadRepoEnv } from './loadRepoEnv.js';
 
 const direction = process.argv[2];
 
@@ -15,6 +16,7 @@ export function migrationProcessOptions(platform: NodeJS.Platform): {
 }
 
 export async function migrate(command: 'up' | 'down'): Promise<void> {
+  loadRepoEnv();
   const { executable, shell } = migrationProcessOptions(process.platform);
   const child = spawn(
     executable,

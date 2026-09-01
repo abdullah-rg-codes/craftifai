@@ -1,6 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import type { Application } from 'express';
-import { createPool } from '@craftifai/db';
+import { createPool, loadRepoEnv } from '@craftifai/db';
 import { createLogger } from './logger.js';
 import { buildApp } from './app.js';
 import { env, loadModelCaBundle, validateRuntimeConfig, apiRequestTimeoutMs } from './env.js';
@@ -15,6 +15,7 @@ const DRAIN_TIMEOUT_MS = 10_000;
 
 const logger = createLogger();
 
+loadRepoEnv();
 try {
   await validateRuntimeConfig();
 } catch (error: unknown) {

@@ -23,7 +23,7 @@
     "test:integration": "pnpm test:intermediate",
     "audit:deps": "pnpm audit --audit-level=high",
     "test:watch": "vitest",
-    "dev": "pnpm --filter api dev & pnpm --filter web dev",
+    "dev": "node ./scripts/dev.mjs",
     "db:migrate:down": "pnpm --filter db migrate:down",
     "db:migrate": "pnpm --filter db run migrate",
     "db:drop": "pnpm --filter db drop",

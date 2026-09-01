@@ -11,27 +11,34 @@ than a larger happy-path-only build.
 
 ## Prerequisites
 
-| Tool             | Version                                      |
-| ---------------- | -------------------------------------------- |
-| Node.js          | 22+                                          |
-| pnpm             | 9+ (repo pins 11.24.0)                       |
-| Docker + Compose | For full stack, integration tests, load test |
+| Tool           | Version                                                                            |
+| -------------- | ---------------------------------------------------------------------------------- |
+| Node.js        | 22+                                                                                |
+| pnpm           | 9+ (repo pins 11.24.0)                                                             |
+| Docker Desktop | Required for Postgres, Redis, mock-model, and Compose. `docker` must be on `PATH`. |
+
+Windows **cmd.exe** does not have `cp` or `&&`. Use `copy` as below, or run the same steps in **PowerShell** / **Git Bash**.
 
 ---
 
 ## Quick start (development)
+
+Fill **`.env` first**. Host commands (`pnpm db:migrate`, `pnpm dev`) read that file; you do not export each variable.
 
 ```bash
 # 1. Clone and install
 git clone https://github.com/abdullah-rg-codes/craftifai.git craftifai && cd craftifai
 pnpm install
 
-# 2. Environment — copy and fill every secret
-cp .env.example .env
+# 2. Environment — copy once, then fill every secret (do not overwrite a filled .env)
+cp .env.example .env          # macOS / Linux / Git Bash
+# Windows cmd:  copy .env.example .env
+# PowerShell:   Copy-Item .env.example .env
 # Set at minimum: POSTGRES_* passwords, SESSION_SECRET, WEBHOOK_SECRET,
 # ENCRYPTION_KEY_BASE64 (openssl rand -base64 32), MOCK_MODEL_API_KEY
+# Also set DATABASE_URL and DATABASE_ADMIN_URL to match those passwords (see .env.example).
 
-# 3. Backing services
+# 3. Backing services (fails if Docker Desktop is not running)
 docker compose up -d postgres redis mock-model
 pnpm db:migrate
 
@@ -43,6 +50,8 @@ pnpm dev
 ```
 
 Open http://localhost:5173 — register creates an organization and administrator.
+
+If `docker` is not recognized, install Docker Desktop and reopen the terminal. Unit tests can still run (`pnpm test:unit`); the API cannot without Postgres and Redis.
 
 ---
 

@@ -1,4 +1,5 @@
 export * from './env.js';
+export * from './loadRepoEnv.js';
 export * from './pool.js';
 export * from './transaction.js';
 export * from './dal.js';
