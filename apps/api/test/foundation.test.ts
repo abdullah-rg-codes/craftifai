@@ -342,6 +342,26 @@ describeIf('Phase 1 foundation', () => {
     await app.get('/purchases').set('Cookie', cookieA).set('X-Org-Id', orgB.id).expect(404);
     await app.get('/audit-events').set('Cookie', cookieA).set('X-Org-Id', orgB.id).expect(404);
     await app.get('/model-config').set('Cookie', cookieA).set('X-Org-Id', orgB.id).expect(404);
+
+    await app
+      .post('/purchases')
+      .set('Cookie', cookieA)
+      .set('X-Org-Id', orgB.id)
+      .set('Idempotency-Key', 'cross-tenant-purchase')
+      .send({ credits: 10 })
+      .expect(404);
+    await app
+      .post('/inference')
+      .set('Cookie', cookieA)
+      .set('X-Org-Id', orgB.id)
+      .set('Idempotency-Key', 'cross-tenant-inference')
+      .send({ max_total_tokens: 100, messages: [{ role: 'user', content: 'hi' }] })
+      .expect(404);
+    await app
+      .post('/purchases')
+      .set('Idempotency-Key', 'anonymous-purchase')
+      .send({ credits: 10 })
+      .expect(401);
   });
 
   it('registration atomically creates an organization, active admin, and zero balance', async () => {

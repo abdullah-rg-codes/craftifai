@@ -119,4 +119,42 @@ describe('authentication rules', () => {
     expect(redis.del).toHaveBeenCalledWith('session:expired-hash');
     expect(pool.connect).not.toHaveBeenCalled();
   });
+
+  it('returns 404 when a valid session asks for an organization it does not belong to', async () => {
+    const pool = {
+      connect: vi.fn(),
+      end: vi.fn(),
+    } as unknown as DatabasePool;
+    const redis = {
+      exists: vi.fn().mockResolvedValue(0),
+      get: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          userId: memberContext.userId,
+          email: memberContext.email,
+          sessionExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+          memberships: [
+            {
+              id: memberContext.membershipId,
+              orgId: memberContext.orgId,
+              role: 'member',
+              status: 'active',
+            },
+          ],
+        }),
+      ),
+      del: vi.fn(),
+    } as unknown as Redis;
+
+    await expect(
+      resolveAuthContext(pool, redis, 'session-hash', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+    ).rejects.toEqual(
+      expect.objectContaining<Partial<AppError>>({
+        code: 'NOT_FOUND',
+        status: 404,
+      }),
+    );
+    await expect(resolveAuthContext(pool, redis, 'session-hash', undefined)).resolves.toEqual(
+      expect.objectContaining({ orgId: memberContext.orgId }),
+    );
+  });
 });

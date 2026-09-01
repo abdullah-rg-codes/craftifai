@@ -2,7 +2,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import type { Request, Response } from 'express';
 import type { Redis } from 'ioredis';
 import { withSystemTransaction, createSystemDal, type DatabasePool } from '@craftifai/db';
-import { hashPassword, verifyPassword, AppError, unauthorized } from '@craftifai/shared';
+import { hashPassword, verifyPassword, AppError, notFound, unauthorized } from '@craftifai/shared';
 import { cookieSecure } from './env.js';
 
 const SESSION_COOKIE = 'craftifai_session';
@@ -200,6 +200,9 @@ export async function resolveAuthContext(
     ? activeMemberships.find((m) => m.orgId === requestedOrgId)
     : activeMemberships[0];
   if (!membership) {
+    if (requestedOrgId) {
+      throw notFound('Organization not found');
+    }
     return undefined;
   }
   return {
