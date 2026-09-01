@@ -35,7 +35,6 @@ export function Layout() {
           <span>
             {session?.email} · {session?.role}
           </span>
-          <Link to="/invite">Accept invite</Link>
           <button type="button" onClick={() => void logout()}>
             Log out
           </button>
