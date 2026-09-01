@@ -71,7 +71,15 @@ class RemoteRequest implements PromiseLike<TestResponse> {
     for (const [key, value] of Object.entries(this.queryParams)) {
       url.searchParams.set(key, String(value));
     }
-    const init: RequestInit = { method: this.method, headers: this.headers, redirect: 'manual' };
+    if (!this.headers.has('connection')) {
+      this.headers.set('connection', 'close');
+    }
+    const init: RequestInit = {
+      method: this.method,
+      headers: this.headers,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(25_000),
+    };
     if (this.payload !== undefined && this.method !== 'GET' && this.method !== 'HEAD') {
       init.body = typeof this.payload === 'string' ? this.payload : JSON.stringify(this.payload);
     }

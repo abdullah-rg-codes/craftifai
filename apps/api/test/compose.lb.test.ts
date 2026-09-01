@@ -15,8 +15,12 @@ describeIf('compose load balancer', () => {
       return;
     }
     const seen = new Set<string>();
-    for (let i = 0; i < 20; i += 1) {
-      const response = await fetch(`${base}/health`);
+    const deadline = Date.now() + 5_000;
+    while (seen.size < 2 && Date.now() < deadline) {
+      const response = await fetch(`${base}/health`, {
+        headers: { connection: 'close' },
+        cache: 'no-store',
+      });
       expect(response.status).toBe(200);
       const body = (await response.json()) as { status: string; replica?: string };
       expect(body.status).toBe('ok');
