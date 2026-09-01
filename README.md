@@ -116,8 +116,16 @@ BOOTSTRAP_EMAIL=admin@example.com BOOTSTRAP_PASSWORD='choose-a-long-passphrase' 
 3. Deliver a **signed** mock-billing webhook (the only credit path). Copy the **Id** from
    the Purchases table. `CREDITS` must match the amount you started.
 
-**Compose** (`http://localhost/`): use bash. Load `WEBHOOK_SECRET` from `.env` first — it is
-not in the shell until you export it.
+The two listings below are the **same webhook**. `WEBHOOK_SECRET` must be loaded from
+`.env` (it is not in the shell until you set it). `BASE_URL` must match how you started:
+
+| How you started | Open in the browser | `BASE_URL` |
+| --------------- | ------------------- | ---------- |
+| Full stack Compose | http://localhost/ | `http://127.0.0.1/api` |
+| `pnpm dev` (Vite) | http://localhost:5173 | `http://127.0.0.1:3000` |
+
+**Linux / macOS / Git Bash** (cmd.exe cannot run this). Compose URL shown; for Vite change
+`BASE_URL` to `http://127.0.0.1:3000`.
 
 ```bash
 export WEBHOOK_SECRET="$(grep -E '^WEBHOOK_SECRET=' .env | cut -d= -f2- | tr -d '\r')"
@@ -141,13 +149,14 @@ console.log(response.status, await response.json());
 "
 ```
 
-**Windows / Cursor PowerShell** with local Vite (`http://localhost:5173`): do not paste the
-bash snippet. `BASE_URL` is `http://127.0.0.1:3000`.
+**Windows PowerShell** — do not paste the bash snippet. Run it from the repo folder
+(quote the path if it has spaces: `cd "C:\path\with spaces\craftifai"`). Compose URL shown;
+for Vite set `$env:BASE_URL = "http://127.0.0.1:3000"`.
 
 ```powershell
 $env:PURCHASE_ID = "<uuid>"
 $env:CREDITS = "50"
-$env:BASE_URL = "http://127.0.0.1:3000"
+$env:BASE_URL = "http://127.0.0.1/api"
 $env:WEBHOOK_SECRET = ((Get-Content .env | Where-Object { $_ -match '^WEBHOOK_SECRET=' }) -replace '^WEBHOOK_SECRET=','').Trim()
 
 node --input-type=module -e @"
@@ -155,7 +164,7 @@ import { createHmac } from 'node:crypto';
 const purchase_id = process.env.PURCHASE_ID;
 const credits = Number(process.env.CREDITS ?? '50');
 const secret = process.env.WEBHOOK_SECRET;
-const base = process.env.BASE_URL ?? 'http://127.0.0.1:3000';
+const base = process.env.BASE_URL ?? 'http://127.0.0.1/api';
 if (!purchase_id || !secret) throw new Error('PURCHASE_ID and WEBHOOK_SECRET are required');
 const timestamp = Math.floor(Date.now() / 1000);
 const body = JSON.stringify({ purchase_id, provider_event_id: 'evt_' + timestamp, credits, timestamp });
