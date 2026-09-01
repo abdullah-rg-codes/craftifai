@@ -18,7 +18,7 @@ import { asyncHandler } from '../errors.js';
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  display_name: z.string().optional(),
+  display_name: z.string().trim().min(1),
 });
 
 const loginSchema = z.object({

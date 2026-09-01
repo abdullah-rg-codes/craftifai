@@ -142,7 +142,7 @@ async function register(
   email: string,
 ): Promise<{ orgId: string; userId: string; cookie: string }> {
   const response = await api(baseUrl, 'POST', '/auth/register', {
-    json: { email, password: PASSWORD },
+    json: { email, password: PASSWORD, display_name: email },
   });
   if (response.status !== 201) {
     throw new Error(`register failed ${String(response.status)} ${JSON.stringify(response.body)}`);

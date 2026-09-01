@@ -24,7 +24,7 @@ export function RegisterPage() {
         body: JSON.stringify({
           email,
           password,
-          ...(displayName.trim() ? { display_name: displayName.trim() } : {}),
+          display_name: displayName.trim(),
         }),
       });
       await refresh();
@@ -57,7 +57,13 @@ export function RegisterPage() {
         </label>
         <label>
           Display name
-          <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            required
+            minLength={1}
+          />
         </label>
         <label>
           Password

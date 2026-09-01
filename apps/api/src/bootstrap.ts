@@ -46,6 +46,7 @@ export async function bootstrapAdministrator(input: {
     const result = await registerUser(pool, redis, {
       email: input.email,
       password: input.password,
+      displayName: input.email.split('@')[0] || 'Administrator',
     });
     logger.info({ userId: result.userId, orgId: result.orgId }, 'bootstrap administrator created');
     return { created: true, userId: result.userId, orgId: result.orgId };

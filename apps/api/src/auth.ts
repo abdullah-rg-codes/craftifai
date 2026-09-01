@@ -239,7 +239,7 @@ export function clearSessionCookie(res: Response): void {
 export async function registerUser(
   pool: DatabasePool,
   redis: Redis,
-  input: { email: string; password: string; displayName?: string | undefined },
+  input: { email: string; password: string; displayName: string },
 ): Promise<{ userId: string; orgId: string; token: string }> {
   const passwordHash = await hashPassword(input.password);
   const { userId, orgId } = await withSystemTransaction(pool, async (ctx) => {
@@ -247,9 +247,9 @@ export async function registerUser(
     const user = await dal.users.create({
       email: input.email,
       passwordHash,
-      displayName: input.displayName ?? null,
+      displayName: input.displayName,
     });
-    const org = await dal.organizations.create(`${input.email}'s organization`);
+    const org = await dal.organizations.create(input.displayName);
     const membership = await dal.memberships.create({
       orgId: org.id,
       userId: user.id,

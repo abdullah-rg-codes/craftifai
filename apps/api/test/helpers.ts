@@ -204,7 +204,7 @@ export async function registerAndLogin(
 ): Promise<{ userId: string; orgId: string; cookie: string[] }> {
   const registerResponse = await app
     .post('/auth/register')
-    .send({ email, password: 'password123' });
+    .send({ email, password: 'password123', display_name: email });
   if (registerResponse.status !== 201) {
     throw new Error(`Registration failed: ${registerResponse.status} ${registerResponse.text}`);
   }

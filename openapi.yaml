@@ -69,11 +69,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email, password]
+              required: [email, password, display_name]
               properties:
                 email: { type: string, format: email }
                 password: { type: string, minLength: 8 }
-                display_name: { type: string }
+                display_name: { type: string, minLength: 1 }
       responses:
         '201':
           description: Created; session cookie set

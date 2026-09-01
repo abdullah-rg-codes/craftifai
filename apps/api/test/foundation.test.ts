@@ -363,6 +363,8 @@ describeIf('Phase 1 foundation', () => {
         response.body.user_id as string,
       );
       expect(membership).toMatchObject({ role: 'administrator', status: 'active' });
+      const org = await dal.organizations.findById(response.body.org_id as string);
+      expect(org?.name).toBe('Owner');
       const account = await ctx.query<{ available: string; reserved: string }>(
         'SELECT available::text, reserved::text FROM org_credit_accounts WHERE org_id = $1',
         [response.body.org_id],
@@ -372,7 +374,16 @@ describeIf('Phase 1 foundation', () => {
 
     await app
       .post('/auth/register')
-      .send({ email: 'owner@example.com', password: 'different-password' })
+      .send({ email: 'missing-name@example.com', password: 'password123' })
+      .expect(400);
+
+    await app
+      .post('/auth/register')
+      .send({
+        email: 'owner@example.com',
+        password: 'different-password',
+        display_name: 'Owner',
+      })
       .expect(409);
   });
 
