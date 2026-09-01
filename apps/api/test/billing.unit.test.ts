@@ -58,4 +58,24 @@ describe('webhook signatures', () => {
       expect((error as AppError).code).toBe('WEBHOOK_REPLAY');
     }
   });
+
+  it('rejects a signed payload whose purchase_id is not a UUID', () => {
+    const signed = signWebhook(
+      {
+        purchase_id: '52bb8b1f-0362-4531-9ab0-b3887afc6247%',
+        provider_event_id: 'evt_malformed',
+        credits: 2,
+      },
+      SECRET,
+      1_700_000_000,
+    );
+    try {
+      verifyWebhook(signed.body, signed.signature, SECRET, 1_700_000_000);
+      expect.unreachable('malformed purchase_id should have been rejected');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe('WEBHOOK_INVALID');
+      expect((error as AppError).status).toBe(400);
+    }
+  });
 });

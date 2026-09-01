@@ -17,6 +17,9 @@ function createErrorApp() {
   app.get('/unique', () => {
     throw Object.assign(new Error('sensitive database detail'), { code: '23505' });
   });
+  app.get('/invalid-uuid', () => {
+    throw Object.assign(new Error('invalid input syntax for type uuid: "foo%"'), { code: '22P02' });
+  });
   app.get('/unknown', () => {
     throw new Error('sensitive internal detail');
   });
@@ -46,6 +49,15 @@ describe('central error mapping', () => {
       error: { code: 'CONFLICT', message: 'Resource already exists' },
     });
     expect(response.text).not.toContain('sensitive database detail');
+  });
+
+  it('maps invalid UUID text without exposing database details', async () => {
+    const response = await app.get('/invalid-uuid').expect(400);
+    expect(response.body).toEqual({
+      error: { code: 'VALIDATION', message: 'Invalid identifier format' },
+    });
+    expect(response.text).not.toContain('invalid input syntax');
+    expect(response.text).not.toContain('foo%');
   });
 
   it('maps unknown errors without leaking internals', async () => {

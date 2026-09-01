@@ -454,6 +454,24 @@ describeIf('Phase 2 credit core', () => {
     expect(staleReplay.body.error.code).toBe('WEBHOOK_REPLAY');
   });
 
+  it('rejects a signed webhook whose purchase_id is not a UUID', async () => {
+    const malformed = signWebhook(
+      {
+        purchase_id: '52bb8b1f-0362-4531-9ab0-b3887afc6247%',
+        provider_event_id: 'evt_malformed_purchase',
+        credits: 2,
+      },
+      env.webhookSecret(),
+    );
+    const response = await app
+      .post('/billing/webhook')
+      .set('X-Webhook-Signature', malformed.signature)
+      .set('Content-Type', 'application/json')
+      .send(malformed.body)
+      .expect(400);
+    expect(response.body.error.code).toBe('WEBHOOK_INVALID');
+  });
+
   it('reconciles an expired reservation and remains correct if swept twice', async () => {
     const admin = await registerAndLogin(app, 'sweep-admin@example.com');
     await seedCredits(adminPool, admin.orgId, 10);

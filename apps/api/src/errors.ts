@@ -26,17 +26,22 @@ export function createErrorHandler(logger: Logger): ErrorRequestHandler {
       });
       return;
     }
-    if (
-      typeof err === 'object' &&
-      err !== null &&
-      'code' in err &&
-      (err as { code: unknown }).code === '23505'
-    ) {
-      const error = conflict('Resource already exists');
-      res.status(error.status).json({
-        error: { code: error.code, message: error.message },
-      });
-      return;
+    if (typeof err === 'object' && err !== null && 'code' in err) {
+      const pgCode = (err as { code: unknown }).code;
+      if (pgCode === '23505') {
+        const error = conflict('Resource already exists');
+        res.status(error.status).json({
+          error: { code: error.code, message: error.message },
+        });
+        return;
+      }
+      if (pgCode === '22P02') {
+        const error = validation('Invalid identifier format');
+        res.status(error.status).json({
+          error: { code: error.code, message: error.message },
+        });
+        return;
+      }
     }
     if (err instanceof AppError) {
       if (err.code === 'RATE_LIMITED') {

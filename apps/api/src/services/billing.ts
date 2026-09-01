@@ -90,5 +90,12 @@ export function verifyWebhook(
     throw webhookInvalid('Malformed webhook payload');
   }
 
+  const purchaseId = (payload as WebhookPayload).purchase_id;
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(purchaseId)
+  ) {
+    throw webhookInvalid('Malformed webhook payload');
+  }
+
   return payload as WebhookPayload;
 }
