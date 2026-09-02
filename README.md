@@ -98,6 +98,11 @@ pnpm test:unit
 pnpm dev
 ```
 
+If migrate reports password authentication failed, the data volume was created with a
+different owner password. From this clone: `docker compose down -v`, then
+`docker compose up -d postgres redis mock-model`, then `pnpm db:migrate` again (this
+wipes local DB data).
+
 Open http://localhost:5173 — register creates an organization and administrator.
 
 If `docker` is not recognized, install Docker Desktop and reopen the terminal. Unit tests can still run (`pnpm test:unit`); the API cannot without Postgres and Redis.
