@@ -38,16 +38,16 @@ cp .env.example .env          # macOS / Linux / Git Bash
 
 Leave ports, `REDIS_URL`, and the other defaults. Fill these eight values in `.env`:
 
-| Variable                  | What to set                                                                                         |
-| ------------------------- | --------------------------------------------------------------------------------------------------- |
-| `POSTGRES_ADMIN_PASSWORD` | Invent a password (owner / migrations)                                                              |
-| `POSTGRES_APP_PASSWORD`   | Invent a **different** password (app role)                                                          |
-| `DATABASE_ADMIN_URL`      | Same admin password in the URL, replacing `CHANGE_ME`                                               |
-| `DATABASE_URL`            | Same app password in the URL, replacing `CHANGE_ME`                                                 |
-| `SESSION_SECRET`          | 32 random bytes, base64 — generate below                                                            |
-| `ENCRYPTION_KEY_BASE64`   | Same generation; must decode to exactly 32 bytes — not a passphrase                                 |
-| `WEBHOOK_SECRET`          | Same generation                                                                                     |
-| `MOCK_MODEL_API_KEY`      | Same generation (paste this **same** value later on the Model page)                                 |
+| Variable                  | What to set                                                         |
+| ------------------------- | ------------------------------------------------------------------- |
+| `POSTGRES_ADMIN_PASSWORD` | Invent a password (owner / migrations)                              |
+| `POSTGRES_APP_PASSWORD`   | Invent a **different** password (app role)                          |
+| `DATABASE_ADMIN_URL`      | Same admin password in the URL, replacing `CHANGE_ME`               |
+| `DATABASE_URL`            | Same app password in the URL, replacing `CHANGE_ME`                 |
+| `SESSION_SECRET`          | 32 random bytes, base64 — generate below                            |
+| `ENCRYPTION_KEY_BASE64`   | Same generation; must decode to exactly 32 bytes — not a passphrase |
+| `WEBHOOK_SECRET`          | Same generation                                                     |
+| `MOCK_MODEL_API_KEY`      | Same generation (paste this **same** value later on the Model page) |
 
 The two URLs must use the passwords you chose, not leftover `CHANGE_ME`. Example:
 

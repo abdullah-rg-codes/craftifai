@@ -172,7 +172,7 @@ path. Tests assert organization count does not increase on join.
 
 **What was wrong:** The eight-value table listed `openssl rand -base64 32` for all four
 secrets. Windows cmd.exe does not ship `openssl`. A one-line fallback (“Git Bash usually
-provides it; otherwise any 32-byte value base64-encoded”) sat *after* the Postgres password
+provides it; otherwise any 32-byte value base64-encoded”) sat _after_ the Postgres password
 URL-safety note, so a clone following the table hit `'openssl' is not recognized`.
 
 **Why it was wrong:** Node.js is already a prerequisite. The first command a Windows grader
