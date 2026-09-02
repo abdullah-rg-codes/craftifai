@@ -9,17 +9,14 @@ if (!root) {
   throw new Error('workspace root not found');
 }
 
+const files = process.argv.slice(2);
+if (files.length === 0) {
+  throw new Error('vitest file paths required');
+}
+
 const child = spawn(
   process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-  [
-    'exec',
-    'vitest',
-    'run',
-    '--fileParallelism=false',
-    'apps/api/test/foundation.test.ts',
-    'apps/api/test/credits.test.ts',
-    'apps/api/test/gateway.test.ts',
-  ],
+  ['exec', 'vitest', 'run', '--fileParallelism=false', ...files],
   {
     cwd: root,
     stdio: 'inherit',

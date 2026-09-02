@@ -214,7 +214,8 @@ Then:
 
 ```bash
 pnpm test:intermediate   # foundation + credits + gateway
-pnpm test                # sanity + intermediate
+pnpm test:advanced       # webhook amount-from-row, member usage isolation, ledger cursor
+pnpm test                # sanity + intermediate + advanced
 ```
 
 Credit, idempotency, and concurrency tests use **real PostgreSQL** — not SQLite, not mocked repositories.

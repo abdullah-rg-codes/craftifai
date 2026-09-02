@@ -132,6 +132,8 @@ jobs:
         run: pnpm test:sanity
       - name: Intermediate — PostgreSQL tenant, credits, gateway
         run: pnpm test:intermediate
+      - name: Advanced — webhook amount, member usage isolation, ledger cursor
+        run: pnpm test:advanced
 
   compose-build:
     runs-on: ubuntu-latest

@@ -116,7 +116,7 @@ All fifteen criteria **implemented** with tests or load harness evidence. See pl
 
 ## §6 Testing expectations
 
-All categories covered. Integration tests require real PostgreSQL + Redis (`pnpm test:intermediate`). CI runs full suite.
+All categories covered. Integration tests require real PostgreSQL + Redis (`pnpm test:intermediate`, `pnpm test:advanced`). CI runs full suite.
 
 ---
 
