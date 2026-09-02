@@ -122,9 +122,21 @@ Open **http://localhost/** — nginx serves the SPA and load-balances `/api/` ac
 
 ### First administrator (Compose without register)
 
+Uncomment `BOOTSTRAP_EMAIL` and `BOOTSTRAP_PASSWORD` in `.env` (no quotes), or pass them
+in the shell. `.env.example` leaves both commented, so Compose will otherwise get empty
+values.
+
 ```bash
 BOOTSTRAP_EMAIL=admin@example.com BOOTSTRAP_PASSWORD='choose-a-long-passphrase' \
   docker compose --profile bootstrap run --rm bootstrap
+```
+
+**Windows cmd.exe** (the snippet above is bash):
+
+```bat
+set BOOTSTRAP_EMAIL=admin@example.com
+set BOOTSTRAP_PASSWORD=choose-a-long-passphrase
+docker compose --profile bootstrap run --rm bootstrap
 ```
 
 ### Configure mock model (admin UI)
