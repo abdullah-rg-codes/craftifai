@@ -17,7 +17,7 @@ than a larger happy-path-only build.
 | pnpm           | 9+ (repo pins 11.24.0)                                                             |
 | Docker Desktop | Required for Postgres, Redis, mock-model, and Compose. `docker` must be on `PATH`. |
 
-Windows **cmd.exe** does not have `cp` or `&&`. Use `copy` as below, or run the same steps in **PowerShell** / **Git Bash**.
+OpenSSL is **not** required. Windows **cmd.exe** does not have `openssl`, `cp`, or `&&`. Use the Node / `copy` commands below, or run the same steps in **PowerShell** / **Git Bash**.
 
 ---
 
@@ -38,16 +38,16 @@ cp .env.example .env          # macOS / Linux / Git Bash
 
 Leave ports, `REDIS_URL`, and the other defaults. Fill these eight values in `.env`:
 
-| Variable                  | What to set                                                                    |
-| ------------------------- | ------------------------------------------------------------------------------ |
-| `POSTGRES_ADMIN_PASSWORD` | Invent a password (owner / migrations)                                         |
-| `POSTGRES_APP_PASSWORD`   | Invent a **different** password (app role)                                     |
-| `DATABASE_ADMIN_URL`      | Same admin password in the URL, replacing `CHANGE_ME`                          |
-| `DATABASE_URL`            | Same app password in the URL, replacing `CHANGE_ME`                            |
-| `SESSION_SECRET`          | `openssl rand -base64 32`                                                      |
-| `ENCRYPTION_KEY_BASE64`   | `openssl rand -base64 32` (must decode to exactly 32 bytes — not a passphrase) |
-| `WEBHOOK_SECRET`          | `openssl rand -base64 32`                                                      |
-| `MOCK_MODEL_API_KEY`      | `openssl rand -base64 32` (paste this same value later on the Model page)      |
+| Variable                  | What to set                                                                                         |
+| ------------------------- | --------------------------------------------------------------------------------------------------- |
+| `POSTGRES_ADMIN_PASSWORD` | Invent a password (owner / migrations)                                                              |
+| `POSTGRES_APP_PASSWORD`   | Invent a **different** password (app role)                                                          |
+| `DATABASE_ADMIN_URL`      | Same admin password in the URL, replacing `CHANGE_ME`                                               |
+| `DATABASE_URL`            | Same app password in the URL, replacing `CHANGE_ME`                                                 |
+| `SESSION_SECRET`          | 32 random bytes, base64 — generate below                                                            |
+| `ENCRYPTION_KEY_BASE64`   | Same generation; must decode to exactly 32 bytes — not a passphrase                                 |
+| `WEBHOOK_SECRET`          | Same generation                                                                                     |
+| `MOCK_MODEL_API_KEY`      | Same generation (paste this **same** value later on the Model page)                                 |
 
 The two URLs must use the passwords you chose, not leftover `CHANGE_ME`. Example:
 
@@ -58,7 +58,33 @@ DATABASE_ADMIN_URL=postgres://craftifai_owner:adminPass1@localhost:5432/craftifa
 DATABASE_URL=postgres://craftifai_app:appPass2@localhost:5432/craftifai?sslmode=disable
 ```
 
-Avoid `@`, `:`, `/`, `#`, and `%` in those passwords or the URLs break. On Windows without `openssl`, Git Bash usually provides it; otherwise any 32-byte value base64-encoded is valid for `ENCRYPTION_KEY_BASE64`.
+Avoid `@`, `:`, `/`, `#`, and `%` in those two passwords or the URLs break.
+
+### Generate the four secrets
+
+`SESSION_SECRET`, `ENCRYPTION_KEY_BASE64`, `WEBHOOK_SECRET`, and `MOCK_MODEL_API_KEY` each need a **different** line. Run the command **four times**. Paste into `.env` with no quotes. `+`, `/`, and `=` in these four values are fine.
+
+**Windows cmd.exe** (Node is already required; `openssl` is usually missing here):
+
+```bat
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+**PowerShell:**
+
+```powershell
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+[Convert]::ToBase64String($bytes)
+```
+
+**macOS / Linux / Git Bash:**
+
+```bash
+openssl rand -base64 32
+```
+
+Keep `MOCK_MODEL_API_KEY` and `WEBHOOK_SECRET` somewhere you can copy during the demo (Model page credential, then the signed webhook command). Do not commit `.env`.
 
 ```bash
 # 3. Backing services (fails if Docker Desktop is not running)

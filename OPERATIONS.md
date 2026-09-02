@@ -54,7 +54,7 @@ Copy `.env.example` → `.env`. Required secrets (Compose fails fast if missing)
 - `SESSION_SECRET`, `WEBHOOK_SECRET`, `ENCRYPTION_KEY_BASE64`
 - `MOCK_MODEL_API_KEY`
 
-Generate: `openssl rand -base64 32` for 32-byte keys.
+Generate 32-byte keys as base64. Windows cmd.exe usually has no `openssl`; use the Node command in the README (PowerShell and Git Bash `openssl` are also listed there).
 
 `COOKIE_SECURE=false` for plain HTTP on-prem; set `true` only when TLS terminates in front of nginx.
 
