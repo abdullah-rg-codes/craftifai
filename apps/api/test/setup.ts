@@ -1,3 +1,7 @@
+import { loadRepoEnv } from '@craftifai/db';
+
+loadRepoEnv();
+
 if (!process.env.ENCRYPTION_KEY_BASE64) {
   process.env.ENCRYPTION_KEY_BASE64 = Buffer.alloc(32, 9).toString('base64');
 }

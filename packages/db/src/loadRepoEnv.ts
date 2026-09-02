@@ -42,6 +42,24 @@ export function applyDotEnvContents(contents: string, env: NodeJS.ProcessEnv = p
   }
 }
 
+const INTEGRATION_ENV_KEYS = [
+  'DATABASE_URL',
+  'DATABASE_ADMIN_URL',
+  'REDIS_URL',
+  'SESSION_SECRET',
+  'WEBHOOK_SECRET',
+  'ENCRYPTION_KEY_BASE64',
+] as const;
+
+/** After `loadRepoEnv()`, so `.env` on the host counts the same as CI-injected variables. */
+export function assertIntegrationTestEnv(env: NodeJS.ProcessEnv = process.env): void {
+  for (const key of INTEGRATION_ENV_KEYS) {
+    if (!env[key]) {
+      throw new Error(`Missing integration-test environment variable: ${key}`);
+    }
+  }
+}
+
 /** Host `pnpm db:migrate` / `pnpm dev` — no-op when the file is missing or vars are already set. */
 export function loadRepoEnv(): void {
   const root = findRepoRoot(process.cwd());

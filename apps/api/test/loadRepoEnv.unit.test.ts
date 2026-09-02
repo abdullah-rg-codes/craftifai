@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyDotEnvContents, findRepoRoot } from '@craftifai/db';
+import { applyDotEnvContents, assertIntegrationTestEnv, findRepoRoot } from '@craftifai/db';
 
 describe('loadRepoEnv', () => {
   it('fills only unset keys and strips quotes', () => {
@@ -23,5 +23,21 @@ describe('loadRepoEnv', () => {
 
   it('finds the workspace root from a package directory', () => {
     expect(findRepoRoot(process.cwd())).toBeDefined();
+  });
+
+  it('requires the six integration keys after env is filled', () => {
+    expect(() => assertIntegrationTestEnv({})).toThrow(
+      'Missing integration-test environment variable: DATABASE_URL',
+    );
+    expect(() =>
+      assertIntegrationTestEnv({
+        DATABASE_URL: 'postgres://app@localhost/db',
+        DATABASE_ADMIN_URL: 'postgres://owner@localhost/db',
+        REDIS_URL: 'redis://localhost:6379/0',
+        SESSION_SECRET: 's',
+        WEBHOOK_SECRET: 'w',
+        ENCRYPTION_KEY_BASE64: 'k',
+      }),
+    ).not.toThrow();
   });
 });
