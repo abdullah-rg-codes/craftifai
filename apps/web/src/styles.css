@@ -164,10 +164,16 @@ td {
 }
 
 .completion {
-  white-space: pre-wrap;
+  white-space: normal;
   background: #fff;
   border: 1px solid #d6d6d2;
   padding: 0.75rem;
+}
+
+.completion pre {
+  margin: 0 0 0.75rem;
+  font: inherit;
+  white-space: pre-wrap;
 }
 
 .muted {

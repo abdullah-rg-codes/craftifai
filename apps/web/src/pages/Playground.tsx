@@ -1,14 +1,20 @@
 import { FormEvent, useState } from 'react';
 import { api, newIdempotencyKey } from '../api.js';
 import { playgroundErrorCopy } from '../errors.js';
+import { playgroundBillingCopy } from '../playgroundCopy.js';
 import { useAuth } from '../auth.js';
+
+interface PlaygroundResult {
+  completion: string | undefined;
+  summary: string | undefined;
+}
 
 export function PlaygroundPage() {
   const { session } = useAuth();
   const role = session?.role ?? 'member';
   const [prompt, setPrompt] = useState('Say hello in one sentence.');
   const [maxTokens, setMaxTokens] = useState('200');
-  const [result, setResult] = useState<string | null>(null);
+  const [result, setResult] = useState<PlaygroundResult | null>(null);
   const [errorCopy, setErrorCopy] = useState<{ title: string; body: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -30,13 +36,10 @@ export function PlaygroundPage() {
           max_total_tokens: Number.parseInt(maxTokens, 10),
         }),
       });
-      const lines = [
-        response.completion,
-        response.usage?.total_tokens !== undefined
-          ? `Tokens used: ${String(response.usage.total_tokens)}. Settled credits: ${String(response.settled_credits ?? '—')}.`
-          : undefined,
-      ].filter((line): line is string => Boolean(line));
-      setResult(lines.join('\n\n') || 'Request completed.');
+      setResult({
+        completion: response.completion,
+        summary: playgroundBillingCopy(response.usage?.total_tokens, response.settled_credits),
+      });
     } catch (err) {
       setErrorCopy(playgroundErrorCopy(err, role));
     } finally {
@@ -47,7 +50,7 @@ export function PlaygroundPage() {
   return (
     <section>
       <h1>Playground</h1>
-      <p>Each run sends a new Idempotency-Key. Credits are reserved before the model is called.</p>
+      <p>Each run is billed separately. Credits are held before the model runs.</p>
       <form onSubmit={(event) => void run(event)}>
         <label>
           Prompt
@@ -73,7 +76,20 @@ export function PlaygroundPage() {
           <p>{errorCopy.body}</p>
         </div>
       ) : null}
-      {result ? <pre className="completion">{result}</pre> : null}
+      {result ? (
+        <div className="completion">
+          {result.completion ? (
+            <>
+              <p>
+                <strong>Model reply</strong>
+              </p>
+              <pre>{result.completion}</pre>
+            </>
+          ) : null}
+          {result.summary ? <p>{result.summary}</p> : null}
+          {!result.completion && !result.summary ? <p>The request completed.</p> : null}
+        </div>
+      ) : null}
     </section>
   );
 }
