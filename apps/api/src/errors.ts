@@ -1,6 +1,6 @@
 import type { ErrorRequestHandler, Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { AppError, conflict, validation } from '@craftifai/shared';
+import { AppError, conflict, serviceUnavailable, validation } from '@craftifai/shared';
 import type { Logger } from './logger.js';
 
 export function createErrorHandler(logger: Logger): ErrorRequestHandler {
@@ -37,6 +37,26 @@ export function createErrorHandler(logger: Logger): ErrorRequestHandler {
       }
       if (pgCode === '22P02') {
         const error = validation('Invalid identifier format');
+        res.status(error.status).json({
+          error: { code: error.code, message: error.message },
+        });
+        return;
+      }
+      if (
+        pgCode === '28P01' ||
+        pgCode === '42P01' ||
+        (pgCode === 'ECONNREFUSED' && (err as { port?: unknown }).port === 5432)
+      ) {
+        const error = serviceUnavailable('Database unavailable');
+        logger.error(
+          {
+            errorCode: String(pgCode),
+            path: req.path,
+            method: req.method,
+            correlationId: req.correlationId,
+          },
+          'database unavailable',
+        );
         res.status(error.status).json({
           error: { code: error.code, message: error.message },
         });
