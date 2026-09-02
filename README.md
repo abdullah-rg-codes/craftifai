@@ -288,24 +288,6 @@ TypeScript `strict: true` and `noUncheckedIndexedAccess` throughout.
 
 ---
 
-## Clean-clone checklist
-
-Verified **2026-08-30** from GitHub `8546688`. Full log: [docs/CLEAN_CLONE_VERIFICATION.md](docs/CLEAN_CLONE_VERIFICATION.md).
-
-- [x] `git clone` fresh directory — PASS (temp clone, HEAD `8546688`)
-- [x] `pnpm install` succeeds (Node 22+) — PASS (`--frozen-lockfile`, 385 packages)
-- [x] `cp .env.example .env` and fill all required secrets — manual step for graders (placeholders only in repo)
-- [x] `docker compose up --build -d` → all services healthy — **CI** `compose-e2e` (no Docker on verification host)
-- [x] http://localhost/ loads SPA (no CDN references in page source) — **CI** compose-e2e CDN check
-- [x] Register or bootstrap → admin login works — **CI** integration + e2e tests
-- [x] `pnpm test:unit` passes without Docker — PASS (62/62)
-- [x] `pnpm test` passes with Postgres/Redis URLs set — **CI** `test` job (PG + Redis service containers)
-- [x] `TEST_BASE_URL=http://127.0.0.1/api pnpm load:test` completes with invariant OK — **CI** `compose-load`
-
-CI on `ubuntu-latest` runs steps equivalent to integration + compose + load on every push ([run 33323775992](https://github.com/abdullah-rg-codes/craftifai/actions/runs/33323775992)).
-
----
-
 ## License
 
 Take-home assignment submission — not licensed for redistribution.
