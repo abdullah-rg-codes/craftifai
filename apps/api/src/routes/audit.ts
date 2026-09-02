@@ -57,6 +57,7 @@ export function buildAuditRouter(
         events: events.map((event) => ({
           id: event.id,
           actor_user_id: event.actor_user_id,
+          actor_email: event.actor_email,
           action: event.action,
           target_type: event.target_type,
           target_id: event.target_id,

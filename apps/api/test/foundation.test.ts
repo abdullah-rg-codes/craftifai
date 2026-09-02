@@ -881,6 +881,7 @@ describeIf('Phase 1 foundation', () => {
     expect(page.body.events[0]).toMatchObject({
       action: 'membership.role.update',
       actor_user_id: admin.userId,
+      actor_email: 'audit-admin@example.com',
       target_id: membership.id,
     });
     expect(page.body.events[0]).not.toHaveProperty('org_id');

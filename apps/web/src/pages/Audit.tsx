@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { PageBody } from '../components/PageState.js';
+import { auditActionLabel, auditActorLabel, auditTargetLabel } from '../auditCopy.js';
 
 interface AuditEvent {
   id: string;
   action: string;
-  actor_user_id: string | null;
+  actor_email: string | null;
   target_type: string | null;
-  target_id: string | null;
+  metadata: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -65,13 +66,9 @@ export function AuditPage() {
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
-                <td>{row.action}</td>
-                <td>{row.actor_user_id ?? '—'}</td>
-                <td>
-                  {row.target_type
-                    ? `${row.target_type}${row.target_id ? ` ${row.target_id}` : ''}`
-                    : '—'}
-                </td>
+                <td>{auditActionLabel(row.action, row.metadata)}</td>
+                <td>{auditActorLabel(row.actor_email)}</td>
+                <td>{auditTargetLabel(row.action, row.target_type)}</td>
                 <td>{new Date(row.created_at).toLocaleString()}</td>
               </tr>
             ))}

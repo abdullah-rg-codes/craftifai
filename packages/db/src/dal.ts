@@ -67,6 +67,7 @@ export interface DbAuditEvent {
 
 export interface DbAuditEventWithCursor extends DbAuditEvent {
   cursor_created_at: string;
+  actor_email: string | null;
 }
 
 export interface DbCreditAccount {
@@ -520,33 +521,38 @@ function createDal(ctx: TransactionContext) {
         cursor: { createdAt: string; id: string } | null,
         limit: number,
       ): Promise<DbAuditEventWithCursor[]> {
+        const select = `SELECT ae.id,
+                    ae.org_id,
+                    ae.actor_user_id,
+                    ae.action,
+                    ae.target_type,
+                    ae.target_id,
+                    ae.metadata,
+                    ae.created_at,
+                    u.email AS actor_email,
+                    to_char(
+                      ae.created_at AT TIME ZONE 'UTC',
+                      'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+                    ) AS cursor_created_at
+               FROM audit_events ae
+               LEFT JOIN users u ON u.id = ae.actor_user_id`;
         if (cursor) {
           return many<DbAuditEventWithCursor>(
             ctx,
-            `SELECT *,
-                    to_char(
-                      created_at AT TIME ZONE 'UTC',
-                      'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
-                    ) AS cursor_created_at
-               FROM audit_events
-              WHERE org_id = $1
-                AND (created_at, id) < ($2::timestamptz, $3)
-              ORDER BY created_at DESC, id DESC
+            `${select}
+              WHERE ae.org_id = $1
+                AND (ae.created_at, ae.id) < ($2::timestamptz, $3)
+              ORDER BY ae.created_at DESC, ae.id DESC
               LIMIT $4`,
             [orgId, cursor.createdAt, cursor.id, limit + 1],
           );
         }
         return many<DbAuditEventWithCursor>(
           ctx,
-          `SELECT *,
-                  to_char(
-                    created_at AT TIME ZONE 'UTC',
-                    'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
-                  ) AS cursor_created_at
-             FROM audit_events
-            WHERE org_id = $1
-            ORDER BY created_at DESC, id DESC
-            LIMIT $2`,
+          `${select}
+              WHERE ae.org_id = $1
+              ORDER BY ae.created_at DESC, ae.id DESC
+              LIMIT $2`,
           [orgId, limit + 1],
         );
       },
