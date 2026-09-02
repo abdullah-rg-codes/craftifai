@@ -14,10 +14,14 @@ export interface DatabasePool {
 export function createPool(
   options: { connectionString?: string; max?: number } = {},
 ): DatabasePool {
-  return new Pool({
+  const pool = new Pool({
     connectionString: options.connectionString ?? databaseUrl(),
     max: options.max ?? 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
   });
+  pool.on('error', (error: Error) => {
+    process.stderr.write(`pg pool idle client error: ${error.message}\n`);
+  });
+  return pool;
 }

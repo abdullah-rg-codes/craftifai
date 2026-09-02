@@ -149,5 +149,5 @@ describeIf('compose load balancer', () => {
       await testApp.pool.end();
       await testApp.adminPool.end();
     }
-  });
+  }, 90_000);
 });

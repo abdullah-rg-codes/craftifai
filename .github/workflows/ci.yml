@@ -202,6 +202,11 @@ jobs:
         run: docker compose exec -T proxy sh -c '! grep -RInE "googleapis|gstatic|jsdelivr|unpkg|cloudflare" /usr/share/nginx/html'
       - run: pnpm test:compose
       - run: bash deploy/test-restore.sh
+      - name: Dump compose logs on failure
+        if: failure()
+        run: |
+          docker compose ps -a
+          docker compose logs --no-color api-1 api-2 postgres proxy
       - if: always()
         run: docker compose down -v
       - name: Offline overlay — no internet, mock model still reachable
