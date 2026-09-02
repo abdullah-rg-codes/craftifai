@@ -168,6 +168,24 @@ path. Tests assert organization count does not increase on join.
 
 ---
 
+## Example 8: README told Windows cmd to run `openssl`
+
+**What was wrong:** The eight-value table listed `openssl rand -base64 32` for all four
+secrets. Windows cmd.exe does not ship `openssl`. A one-line fallback (“Git Bash usually
+provides it; otherwise any 32-byte value base64-encoded”) sat _after_ the Postgres password
+URL-safety note, so a clone following the table hit `'openssl' is not recognized`.
+
+**Why it was wrong:** Node.js is already a prerequisite. The first command a Windows grader
+or demo machine runs for secrets must work in cmd.exe. A buried sentence is not a procedure.
+
+**How detected:** Fresh Full-stack setup on Windows cmd, following the README table.
+
+**What replaced it:** A “Generate the four secrets” subsection with cmd (`node -e` crypto),
+PowerShell, and openssl. Table rows point at that subsection. Prerequisites state OpenSSL
+is optional.
+
+---
+
 ## Supervision model
 
 AI accelerated scaffolding and boilerplate. **Invariants were decided in the design brief

@@ -14,7 +14,7 @@ Every secret comes from the environment or a mounted file. Copy [`.env.example`]
 
 - `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_PASSWORD`
 - `SESSION_SECRET`, `WEBHOOK_SECRET`
-- `ENCRYPTION_KEY_BASE64` (exactly 32 bytes, `openssl rand -base64 32`) or `ENCRYPTION_KEY_FILE`
+- `ENCRYPTION_KEY_BASE64` (exactly 32 bytes, base64 — README has cmd.exe / PowerShell / openssl) or `ENCRYPTION_KEY_FILE`
 - `MOCK_MODEL_API_KEY`
 
 Missing names fail startup with the variable in the error. The API does not listen until that check passes.
