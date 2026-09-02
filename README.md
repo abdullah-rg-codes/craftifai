@@ -292,7 +292,6 @@ worst-case bound is the 60 s cache TTL if eviction fails.
 | [docs/decisions/](docs/decisions/)                                   | Architecture decision records                |
 | [docs/REQUIREMENT_AUDIT.md](docs/REQUIREMENT_AUDIT.md)               | Phase 7 requirement trace                    |
 | [docs/CLEAN_CLONE_VERIFICATION.md](docs/CLEAN_CLONE_VERIFICATION.md) | Clean-clone verification log                 |
-| [docs/INTERVIEW_PREP.md](docs/INTERVIEW_PREP.md)                     | Oral defense cheat sheet                     |
 | [deploy/README.md](deploy/README.md)                                 | On-prem Compose details                      |
 | [load/REPORT.md](load/REPORT.md)                                     | Load-test results                            |
 
