@@ -14,7 +14,7 @@
     "@craftifai/shared": "workspace:*",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router": "^7.6.0"
+    "react-router": "^8.3.1"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.0",
