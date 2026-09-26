@@ -14,9 +14,9 @@
     "migrate:down": "tsx ./src/migrate.ts down"
   },
   "dependencies": {
-    "dbmate": "^2.26.0",
+    "dbmate": "^2.36.0",
     "pg": "^8.15.6",
-    "tsx": "^4.19.4"
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
     "@types/pg": "^8.15.3",
